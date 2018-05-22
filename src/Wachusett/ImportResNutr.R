@@ -156,7 +156,7 @@ if (length(dupes) > 0){
 }
 ### Make sure records are not already in DB
 
-Uniq <- dbGetQuery(con,"SELECT UniqueID FROM tbl_Nutrients")
+Uniq <- dbGetQuery(con,paste0("SELECT UniqueID, ID FROM ", ImportTable))
 dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
 
 if (length(dupes2) > 0){
