@@ -161,7 +161,7 @@ df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%
 # }
 ### Make sure records are not already in DB
 
-Uniq <- dbGetQuery(con,"SELECT UniqueID FROM tblWQALLDATA")
+Uniq <- dbGetQuery(con, paste0("SELECT UniqueID FROM ", ImportTable))
 dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
 
 if (length(dupes2) > 0){
