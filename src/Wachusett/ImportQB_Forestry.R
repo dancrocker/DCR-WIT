@@ -356,5 +356,5 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 
 # IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable)
-### END
+
 
