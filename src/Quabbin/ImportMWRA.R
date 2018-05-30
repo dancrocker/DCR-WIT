@@ -133,6 +133,7 @@ df.wq$Location %<>%
   gsub("WACHUSET-","", .) %>%
   gsub("BMP1","FPRN", .) %>%
   gsub("BMP2","FHLN", .) %>%
+  gsub("M754","MD75.4", .) %>%
   gsub("QUABBINT-","", .) %>%
   gsub("QUABBIN-","", .)
 

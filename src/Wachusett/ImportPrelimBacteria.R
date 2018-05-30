@@ -178,7 +178,8 @@ df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed =
 
 # Fix the Location names
 df.wq$Location %<>%
-  gsub("WACHUSET-","", .)
+  gsub("WACHUSET-","", .) %>% 
+  gsub("M754","MD75.4", .)
 
 ######################
 #   Add new Columns  #
