@@ -11,45 +11,44 @@
 
 #!# Delete # when running outside Shiny
 
-library(tidyverse)
-library(stringr)
-library(odbc)
-library(RODBC)
-library(DBI)
-library(lubridate)
-library(magrittr)
-library(readxl)
-library(DescTools)
-
-scriptname <- "ImportTribsQB.R"
-config <- read.csv("//env.govt.state.ma.us/enterprise/DCR-WestBoylston-WKGRP/WatershedJAH/EQStaff/WQDatabase/R-Shared/WAVE-WIT/Configs/WAVE_WIT_Config.csv", header = TRUE)
-config <- as.character(config$CONFIG_VALUE)
-dataset <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
-filter(ImportMethod == "Importer-R" & ScriptProcessImport == scriptname)
-#Choose the dataset from options (Trib Selected):
-dataset <- slice(dataset,1)
-
-### Function Arguments:
-rawdatafolder <- paste0(dataset[10])
-processedfolder <- paste0(dataset[11])
-filename.db <- paste0(dataset[6])
-ImportTable <- paste0(dataset[7])
-ImportFlagTable <- NULL # This data has no related flag table
-probe <- "Eureka"
-#
-# ### Find the file to Import -  if this will always be a csv then your regex need not include "xlsx" both here and in your datasets excel file
-files <- grep(
-  x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-  pattern = "^(?=.*\\b(xlsx|csv)\\b)(?!.*\\$\\b)", # regex to show xlsx files, but filter out lockfiles string = "$"
-  value = T,
-  perl =T
-)
-
-#  List the files:
-files
-
-# # Select the file to import manually
-file <- files[1]
+# library(tidyverse)
+# library(stringr)
+# library(odbc)
+# library(RODBC)
+# library(DBI)
+# library(lubridate)
+# library(magrittr)
+# library(readxl)
+# library(DescTools)
+# 
+# scriptname <- "ImportTribsQB.R"
+# config$CONFIG_VALUE)config <- as.character
+# dataset <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
+# filter(ImportMethod == "Importer-R" & ScriptProcessImport == scriptname)
+# #Choose the dataset from options (Trib Selected):
+# dataset <- slice(dataset,1)
+# 
+# ### Function Arguments:
+# rawdatafolder <- paste0(dataset[10])
+# processedfolder <- paste0(dataset[11])
+# filename.db <- paste0(dataset[6])
+# ImportTable <- paste0(dataset[7])
+# ImportFlagTable <- NULL # This data has no related flag table
+# probe <- "Eureka"
+# #
+# # ### Find the file to Import -  if this will always be a csv then your regex need not include "xlsx" both here and in your datasets excel file
+# files <- grep(
+#   x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
+#   pattern = "^(?=.*\\b(xlsx|csv)\\b)(?!.*\\$\\b)", # regex to show xlsx files, but filter out lockfiles string = "$"
+#   value = T,
+#   perl =T
+# )
+# 
+# #  List the files:
+# files
+# 
+# # # Select the file to import manually
+# file <- files[1]
 
 ###############################################################################################
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
@@ -217,7 +216,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 ### END 
 
-#!# Remove comments outside Shiny
-IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-            ImportTable = ImportTable, ImportFlagTable = NULL)
+# #!# Remove comments outside Shiny
+# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+#             ImportTable = ImportTable, ImportFlagTable = NULL)
 
