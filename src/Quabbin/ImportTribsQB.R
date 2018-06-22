@@ -35,7 +35,6 @@
 #filename.db <- paste0(dataset[6])
 #ImportTable <- paste0(dataset[7])
 #ImportFlagTable <- NULL # This data has no related flag table
-#probe <- "Eureka"
 #
 # ### Find the file to Import -  if this will always be a csv then your regex need not include "xlsx" both here and in your datasets excel file
 #files <- grep(
@@ -77,7 +76,11 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # reformat the Quabbin Trib field data to "Tidy" data format ("Long" instead of "Wide")
   df.wq <- gather(df.wq, Parameter, Result, c(1:5))
   df.wq$Result <- round(as.numeric(df.wq$Result), 3)
-  
+
+  #!#Probe information
+  probe <- "Eureka"
+  df.wq$Probe_Type <- probe
+    
   #Specify database connection
   con <- dbConnect(odbc::odbc(),
                    .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
@@ -85,8 +88,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
                    timezone = "America/New_York")
   df_param <- dbReadTable(con,"tblParameters")
   
-  df.wq$Probe_Type <- probe
-  
+
   # UniqueID
   df.wq$UniqueID <- "" # I think this line is unnecessary too, but can leave it in just to be sure
   df.wq$UniqueID <- paste(df.wq$Site, df.wq$SampleDateTime, df.wq$Parameter,  sep = "_")
