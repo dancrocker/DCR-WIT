@@ -22,6 +22,8 @@
 # library(DescTools)
 
 # scriptname <- "ImportResQB.R"
+# config <- read.csv("//env.govt.state.ma.us/enterprise/DCR-WestBoylston-WKGRP/WatershedJAH/EQStaff/WQDatabase/R-Shared/WAVE-WIT/Configs/WAVE_WIT_Config.csv", header = TRUE)
+# config <- as.character(config$CONFIG_VALUE)
 # dataset <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
 # filter(ImportMethod == "Importer-R" & ScriptProcessImport == scriptname)
 
@@ -31,7 +33,6 @@
 # filename.db <- paste0(dataset[6])
 # ImportTable <- paste0(dataset[7])
 # ImportFlagTable <- NULL # This data has no related flag table
-# probe <- "Eureka"
 #
 # ### Find the file to Import -  if this will always be a csv then your regex need not include "xlsx" both here and in your datasets excel file
 # files <- grep(
@@ -57,7 +58,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   path <- paste0(rawdatafolder,"/", file)
 
 # Read in the raw data - csv files can only have 1 sheet
-  df.wq <- read.csv(path, header = T)# , row.names = as.character(seq.int(1:rows)))
+  df.wq <- read.csv(path, header = TRUE)# , row.names = as.character(seq.int(1:rows)))
 
 # Data class/formats
   df.wq$SampleDateTime <- as.POSIXct(paste(mdy(df.wq$DATE), df.wq$TIME, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
@@ -72,14 +73,15 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   df.wq <- gather(df.wq, Parameter, Result, c(2:8))
   df.wq$Result <- round(as.numeric(df.wq$Result), 3) # This is going to be updated soon to be parameters specific rounding
 
+#!# Probe information
+  df.wq$Probe_Type <- "Eureka"
+
 #Specify database connection
   con <- dbConnect(odbc::odbc(),
                    .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
                                               paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                    timezone = "America/New_York")
   df_param <- dbReadTable(con,"tblParameters")
-
-  df.wq$Probe_Type <- probe
 
 # UniqueID
   df.wq$UniqueID <- "" # I think this line is unnecessary too, but can leave it in just to be sure
@@ -120,7 +122,6 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
 
 # Assign the numbers
   df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
-#!# Should each record have a datasource that matches an individual file? Right now this is just sequential, so I do not see the point here
 
 ### Importdate (Date)
   df.wq$ImportDate <- today()
