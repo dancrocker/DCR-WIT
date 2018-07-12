@@ -25,7 +25,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
    df.wq <- read_excel(path, sheet = 1, col_names = TRUE, trim_ws = TRUE, range = cell_cols("A:E")) # This is the raw stage data
 
   # Remove first row which contains useless column headers and only keep columns 1,3,5
-  df.wq <- df.wq[-1,c(1,3,5)]
+  df.wq <- df.wq[-1,c(2,4,6)]
 
   # Change column names
   names(df.wq) = c("DateTime", "WaterTemp_C", "Stage_ft")
