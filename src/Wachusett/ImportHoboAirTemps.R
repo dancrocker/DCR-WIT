@@ -27,13 +27,19 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Remove first row which contains useless column headers, Take only Date and Airtemp columns
   df.wq <- df.wq[-1,c(2,4)]
   # Change column names
-  names(df.wq) = c("DateTime", "AirTemp_F")
+  names(df.wq) = c("DateTime", "AirTemp_C")
   df.wq <- df.wq[!df.wq$DateTime == "",]
   # Change data types to numeric
   df.wq[sapply(df.wq, is.character)] <- lapply(df.wq[sapply(df.wq, is.character)], as.numeric)
   # Convert DateTime format and update timezone
   df.wq$DateTime <- XLDateToPOSIXct(df.wq$DateTime)
   df.wq$DateTime <- force_tz(df.wq$DateTime, tzone = "America/New_York")
+  
+  # Filter out blank times due to daylight savings time 
+  df.wq <- filter(df.wq, !is.na(DateTime))
+  
+  # Convert F to C
+  df.wq$AirTemp_C <- round(5/9 * (df.wq$AirTemp_C -32), 2)
 
   # Get the tributary code for this air temp data
   trib <- substr(file,1,4)
@@ -41,7 +47,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Create new dataframe that calculates daily min, mean, max
   df.wq <- df.wq %>%
     group_by(date(df.wq$DateTime)) %>%
-    summarize(AirTemp_F_min = min(AirTemp_F), AirTemp_F_mean = mean(AirTemp_F), AirTemp_F_max = max(AirTemp_F))
+    summarize(AirTemp_C_min = min(AirTemp_C), AirTemp_C_mean = mean(AirTemp_C), AirTemp_C_max = max(AirTemp_C))
 
   # Change first column name to "Date"
   colnames(df.wq)[1] <- "DATE"
