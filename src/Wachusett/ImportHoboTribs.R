@@ -22,7 +22,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Get the full path to the file
    path <- paste0(rawdatafolder, "/", file)
    # Read in the data to a dataframe
-   df.wq <- read_excel(path, sheet = 1, col_names = TRUE, trim_ws = TRUE, range = cell_cols("A:E")) # This is the raw stage data
+   df.wq <- read_excel(path, sheet = 1, col_names = TRUE, trim_ws = TRUE, range = cell_cols("A:F")) # This is the raw stage data
 
   # Remove first row which contains useless column headers and only keep columns 1,3,5
   df.wq <- df.wq[-1,c(2,4,6)]
