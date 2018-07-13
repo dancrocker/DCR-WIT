@@ -37,7 +37,10 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Convert DateTime format and update timezone
   df.wq$DateTime <- XLDateToPOSIXct(df.wq$DateTime)
   df.wq$DateTime <- force_tz(df.wq$DateTime, tzone = "America/New_York")
-
+  
+  # Filter out blank times due to daylight savings time 
+  df.wq <- filter(df.wq, !is.na(DateTime))
+  
   # Convert F to C
   df.wq$WaterTemp_C <- round(5/9 * (df.wq$WaterTemp_C -32), 2)
 
