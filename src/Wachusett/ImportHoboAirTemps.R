@@ -54,7 +54,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Assign the appropriate trib code
   df.wq$TRIBUTARY <- trib
   # Generate a new ID number
-  con <-  odbcConnectAccess("C:/WQDatabase/WACHUSETT_WQDB_fe.mdb")
+  con <-  odbcConnectAccess(filename.db)
   hobo <- sqlFetch(con, "tblHOBO_AIRTEMP")
   LastID <- as.numeric(max(hobo$ID))
   if(LastID == -Inf) {
