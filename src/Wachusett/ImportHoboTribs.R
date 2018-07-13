@@ -182,7 +182,7 @@ ARC_Flags$FlagCode <- 111
     group_by(date(df.wq$DateTime)) %>%
     summarize(stage_min = min(Stage_ft), stage_mean = mean(Stage_ft), stage_max = max(Stage_ft),
               q_min_cfs = min(q_cfs), q_mean_cfs = mean(q_cfs), q_max_cfs = max(q_cfs),
-              WaterTemp_min = min(WaterTemp_F), WaterTemp_mean = mean(WaterTemp_F), WaterTemp_max = max(WaterTemp_F))
+              WaterTemp_min = min(WaterTemp_C), WaterTemp_mean = mean(WaterTemp_C), WaterTemp_max = max(WaterTemp_C))
 
 # Change first column name to "Date"
   colnames(df.wq)[1] <- "DATE"
