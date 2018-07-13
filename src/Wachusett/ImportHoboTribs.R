@@ -214,9 +214,8 @@ ARC_Flags$FlagCode <- 111
                    timezone = "America/New_York")
 
   # Make the df for any flags
-
     setFlagIDs <- function(){
-      if(nrow(ARC_Flags) + nrow(BRC_Flags) > 0){ # Condition returns TRUE if there is at least 1 data flag, so proceed
+      if(!is.null(ARC_Flags) | !is.null(BRC_Flags)){ # Condition returns TRUE at least one is not null
         query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblHOBO_FlagIndex")
         # Get current max ID
         if(is.na(query.flags)) {
