@@ -22,10 +22,10 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
 
   path <- paste0(rawdatafolder, "/", file)
   # Read in the data to a dataframe
-  df.wq <- read_excel(path, sheet = 1, col_names = TRUE, trim_ws = TRUE, range = cell_cols("A:B")) # This is the raw stage data
+  df.wq <- read_excel(path, sheet = 1, col_names = TRUE, trim_ws = TRUE, range = cell_cols("A:D")) # This is the raw stage data
 
-  # Remove first row which contains useless column headers
-  df.wq <- df.wq[-1,]
+  # Remove first row which contains useless column headers, Take only Date and Airtemp columns
+  df.wq <- df.wq[-1,c(2,4)]
   # Change column names
   names(df.wq) = c("DateTime", "AirTemp_F")
   df.wq <- df.wq[!df.wq$DateTime == "",]
@@ -35,7 +35,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   df.wq$DateTime <- XLDateToPOSIXct(df.wq$DateTime)
   df.wq$DateTime <- force_tz(df.wq$DateTime, tzone = "America/New_York")
 
-  # Get the tributary code for this stage data
+  # Get the tributary code for this air temp data
   trib <- substr(file,1,4)
 
   # Create new dataframe that calculates daily min, mean, max
