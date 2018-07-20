@@ -171,7 +171,6 @@ setIDs <- function(){
 }
 df.wq$ID <- setIDs()
 
-
 df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)]
 # Reorder remaining 30 columns to match the database table exactly
 cnames <- dbListFields(con, ImportTable)
@@ -225,8 +224,8 @@ rm(con)
 }
 ### END
 
-# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-#             ImportTable = ImportTable, ImportFlagTable = NULL)
+IMPORT_DATA(df.wq = df.wq2, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+            ImportTable = ImportTable, ImportFlagTable = NULL)
 
 
 
