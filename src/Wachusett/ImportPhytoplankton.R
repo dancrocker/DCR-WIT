@@ -224,8 +224,8 @@ rm(con)
 }
 ### END
 
-IMPORT_DATA(df.wq = df.wq2, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-            ImportTable = ImportTable, ImportFlagTable = NULL)
+# IMPORT_DATA(df.wq = df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+#             ImportTable = ImportTable, ImportFlagTable = NULL)
 
 
 
