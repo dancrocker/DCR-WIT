@@ -14,7 +14,7 @@
 ####################################################################################################
 # Load Libraries and Script (Sources, Modules, and Functions)
 #####################################################################################################
-
+print(paste0("WIT App lauched at ", Sys.time()))
 ### Load packages
 
 ipak <- function(pkg){
@@ -252,7 +252,7 @@ ui <- tagList(
 ) # End tagList
 
 ########################################################################################
-################################    Server   ###########################################
+################################    SERVER   ###########################################
 ########################################################################################
 
 server <- function(input, output, session) {
@@ -267,25 +267,32 @@ server <- function(input, output, session) {
     filter(datasets, DataType == input$datatype)
   })
   scriptname <- reactive({ # Scripts common to both QB and Wach must be in both src folders!
+    req(ds())
     paste0(getwd(), "/src/", userlocation, "/",ds()$ScriptProcessImport[1])
   })
   rawdatafolder <- reactive({
+    req(ds())
     ds()$RawFilePath[1]
   })
   ImportTable <- reactive({
+    req(ds())
     ds()$TableName[1]
   })
   ImportFlagTable <- reactive({
+    req(ds())
     ds()$FlagTable[1]
   })
   processedfolder <- reactive({
+    req(ds())
     ds()$ProcessedFilePath[1]
   })
 
   filename.db <- reactive({
+    req(ds())
     ds()$DBPath[1]
   })
   distro1 <- reactive({
+    req(ds())
     as.character(ds()$EmailList[1]) %>%
       strsplit(", ")
   })
@@ -326,7 +333,8 @@ server <- function(input, output, session) {
                 choices = c("Hydrolab Datasonde3 H20",
                             "YSI_EXO2",
                             "DEP YSI",
-                            "Hydrolab MS5"),
+                            "Hydrolab MS5",
+                            "Hydrolab Surveyor II"),
                 selected = "YSI_EXO2")
   })
 
@@ -348,9 +356,15 @@ server <- function(input, output, session) {
   })
 
   # Extract each dataframe
-  df.wq           <- reactive({dfs()[[1]]})
-  path            <- reactive({dfs()[[2]]})
-  df.flags        <- reactive({dfs()[[3]]})
+  df.wq <- reactive({
+            dfs()[[1]]
+        })
+  path  <- reactive({
+            dfs()[[2]]
+        })
+  df.flags  <- reactive({
+            dfs()[[3]]
+        })
 
   # Last File to be Processed
   file.processed <- eventReactive(input$process, {
@@ -405,8 +419,8 @@ server <- function(input, output, session) {
           ImportFailed <- any(class(out) == "error")
 
           if (ImportFailed == TRUE){
-            print(paste0("Import Failed at ", Sys.time() ,". There was an error:"))
-            # print(e)
+            print(paste0("Import Failed at ", Sys.time() ,". There was an error: "))
+            print(out)
           } else {
             print(paste0("Data Import Successful at ", Sys.time()))
             NewCount <- actionCount() + 1
@@ -491,24 +505,30 @@ server <- function(input, output, session) {
     filter(flagdatasets, DataType == input$flagdatatype)
   })
   flag.db <- reactive({
+    req(dsflags())
     dsflags()$DBPath[1]
   })
   datatable <- reactive({
+    req(dsflags())
     dsflags()$TableName[1]
   })
   flagtable <- reactive({
+    req(dsflags())
     dsflags()$FlagTable[1]
   })
   flagSelected <- reactive({
+    req(input$flag)
     as.numeric(substr(input$flag, 1, 3))
     })
 
   distro2 <- reactive({
+    req(dsflags())
     as.character(dsflags()$EmailList[1]) %>%
       strsplit(", ")
   })
 
   flagsA <- reactive({
+    req(isTruthy(input$flagsA))
     if(isTruthy(input$flagsA)){
       x <- str_split(input$flagsA,",") %>%
         lapply(function(x) as.numeric(x))
@@ -520,6 +540,7 @@ server <- function(input, output, session) {
   })
 
   flagsB <- reactive({
+    # req(isTruthy(input$flagsB1)) ### This line prevented the preview data UI from displaying
     if(isTruthy(input$flagsB1) & isTruthy(input$flagsB2)){
       as.vector(as.integer(seq.int(input$flagsB1, input$flagsB2, 1)))
     }
@@ -529,6 +550,7 @@ server <- function(input, output, session) {
   })
 
   flagsC <- reactive({
+    # req(input$flagsC)
     if(isTruthy(input$flagsC)){
       inFile <- input$flagsC
       as.integer(unlist(as.vector(read.csv(inFile$datapath, header = input$header))))
@@ -607,7 +629,7 @@ server <- function(input, output, session) {
 
     if (ImportFailed == TRUE){
       print(paste0("Flag Import Failed at ", Sys.time(), ". There was an error: "))
-      print(e)
+      print(out)
     } else {
       print(paste0("Flag Import Successful at ", Sys.time()))
       NewCount <- actionCount() + 1
@@ -690,6 +712,7 @@ server <- function(input, output, session) {
           } else {
             print("Action Count was 0, data not modified in databases; New .rds files will not be generated")
           }
+    print(paste0("WIT session ended at ", Sys.time()))
     stopApp()
   })
 

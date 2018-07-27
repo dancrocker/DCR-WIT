@@ -48,12 +48,12 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
 
   # Make a dataframe to import to the flag index table - Send to UI for inspection
   df.manualflags <- data.frame(ID = seq.int(from = maxFlagID + 1, to = maxFlagID + length(flagRecords), by = 1),
-                                 SampleID = flagRecords,
-                                 FlagCode = flag,
-                                 DateFlagged = today(),
-                                 ImportStaff = username
-                               )
-
+                               DataTableName = datatable,  
+                               SampleID = flagRecords,
+                               FlagCode = flag,
+                               DateFlagged = today(),
+                               ImportStaff = username
+                            )
  # Disconnect from db and remove connection obj
  dbDisconnect(con)
  rm(con)
