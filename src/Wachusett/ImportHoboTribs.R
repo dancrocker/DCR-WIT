@@ -216,7 +216,7 @@ ARC_Flags$FlagCode <- 111
   # Make the df for any flags
     setFlagIDs <- function(){
       if(!is.null(ARC_Flags) | !is.null(BRC_Flags)){ # Condition returns TRUE at least one is not null
-        query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblHOBO_FlagIndex")
+        query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblHydroFlagIndex")
         # Get current max ID
         if(is.na(query.flags)) {
           query.flags <- 0
@@ -233,11 +233,12 @@ ARC_Flags$FlagCode <- 111
 
         ### ID flags
         df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-        df.flags$DateFlagged = as.Date(Sys.time())
-        df.flags$ImportStaff = Sys.getenv("USERNAME")
+        df.flags$DataTableName  <- "tblHOBO_DATA"
+        df.flags$DateFlagged <-  Sys.Date()
+        df.flags$ImportStaff <-  Sys.getenv("USERNAME")
 
         # Reorder df.flags columns to match the database table exactly- the Date column is dropped
-        df.flags <- df.flags[,c(4,3,2,5,6)]
+        df.flags <- df.flags[,c(4,5,3,2,6,7)]
       } else { # Condition False - There were no ARC or BRC stages
         df.flags <- NA
       } # End flags processing chunk
@@ -273,7 +274,7 @@ ARC_Flags$FlagCode <- 111
 
 # Save the Flags to the flag index table
   if (!is.na(df.flags)){ # Check and make sure there is flag data to import
-    sqlSave(con, df.flags, tablename = "tblHOBO_FlagIndex", append = T,
+    sqlSave(con, df.flags, tablename = "tblHydroFlagIndex", append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
   }
 
