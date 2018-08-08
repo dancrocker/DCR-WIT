@@ -13,7 +13,7 @@
 
 ####################################################################################################
 # Load Libraries and Script (Sources, Modules, and Functions)
-#####################################################################################################
+####################################################################################################
 print(paste0("WIT App lauched at ", Sys.time()))
 ### Load packages
 
@@ -432,21 +432,21 @@ server <- function(input, output, session) {
 
   # Function to send ImportEmail
   ImportEmail <- function() {
-    out <- tryCatch({
-      message("Trying to send email")
+    out <- tryCatch(
+      message("Trying to send email"),
       sendmail(from = paste0("<",useremail,">"),
                to = distro1(),
                subject = paste0("New Data has been Imported to a ", userlocation," Database"),
                msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
                             input$datatype, " | Filename = ", input$file),
                control=list(smtpServer=MS))
-      },
+      ,
       error=function(cond) {
-        message(paste("User cannot connect to SMTP Server, cannot send email"))
+        message(paste("User cannot connect to SMTP Server, cannot send email", cond))
         return(NA)
       },
       warning=function(cond) {
-        message(paste("Send mail function caused a warning, but was completed successfully"))
+        message(paste("Send mail function caused a warning, but was completed successfully", cond))
         return(NULL)
       },
       finally={
@@ -505,15 +505,15 @@ server <- function(input, output, session) {
     filter(flagdatasets, DataType == input$flagdatatype)
   })
   flag.db <- reactive({
-    req(dsflags())
+    # req(dsflags())
     dsflags()$DBPath[1]
   })
-  datatable <- reactive({
-    req(dsflags())
+  datatable2 <- reactive({
+    # req(dsflags())
     dsflags()$TableName[1]
   })
   flagtable <- reactive({
-    req(dsflags())
+    # req(dsflags())
     dsflags()$FlagTable[1]
   })
   flagSelected <- reactive({
@@ -522,13 +522,13 @@ server <- function(input, output, session) {
     })
 
   distro2 <- reactive({
-    req(dsflags())
+    # req(dsflags())
     as.character(dsflags()$EmailList[1]) %>%
       strsplit(", ")
   })
 
   flagsA <- reactive({
-    req(isTruthy(input$flagsA))
+    # req(isTruthy(input$flagsA))
     if(isTruthy(input$flagsA)){
       x <- str_split(input$flagsA,",") %>%
         lapply(function(x) as.numeric(x))
@@ -600,7 +600,7 @@ server <- function(input, output, session) {
    # # Run the function to process
   df.manualflags <- eventReactive(input$processflags, {
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    PROCESS_DATA(flag.db = flag.db() , datatable = datatable(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
+    PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
   })
 
   # Processed Flag Table - Only make table if processing is successful

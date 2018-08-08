@@ -52,8 +52,9 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
                                SampleID = flagRecords,
                                FlagCode = flag,
                                DateFlagged = today(),
-                               ImportStaff = username
+                               ImportStaff = as.character(username)
                             )
+# df.manualflags$ImportStaff <- as.character(df.manualflags$ImportStaff)
  # Disconnect from db and remove connection obj
  dbDisconnect(con)
  rm(con)
