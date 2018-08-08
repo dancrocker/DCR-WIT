@@ -328,9 +328,9 @@ setFlagIDs <- function(){
   }
   ### ID flags
   df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-  ds.flags$DataTableName <- ImportTable
+  df.flags$DataTableName <- ImportTable
   df.flags$DateFlagged <-  Sys.Date()
-  df.flags$ImportStaff <-  Sys.getenv("USERNAME")
+  df.flags$ImportStaff <-  username
 
   # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
   df.flags <- df.flags[,c(3,4,1,2,5,6)]

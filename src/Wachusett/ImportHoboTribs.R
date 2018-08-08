@@ -235,7 +235,7 @@ ARC_Flags$FlagCode <- 111
         df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
         df.flags$DataTableName  <- "tblHOBO_DATA"
         df.flags$DateFlagged <-  Sys.Date()
-        df.flags$ImportStaff <-  Sys.getenv("USERNAME")
+        df.flags$ImportStaff <-  username
 
         # Reorder df.flags columns to match the database table exactly- the Date column is dropped
         df.flags <- df.flags[,c(4,5,3,2,6,7)]

@@ -61,7 +61,7 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
  return(df.manualflags)
 
 }
-# PROCESS_DATA(flag.db, datatable, flagtable, flag, flagRecords)
+# df.manualflags <- PROCESS_DATA(flag.db, datatable, flagtable, flag, flagRecords)
 
 IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags){
 
