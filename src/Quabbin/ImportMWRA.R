@@ -328,11 +328,12 @@ setFlagIDs <- function(){
   }
   ### ID flags
   df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-  df.flags$DateFlagged = today()
-  df.flags$ImportStaff = Sys.getenv("USERNAME")
-
+  ds.flags$DataTableName <- ImportTable
+  df.flags$DateFlagged <-  Sys.Date()
+  df.flags$ImportStaff <-  Sys.getenv("USERNAME")
+  
   # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-  df.flags <- df.flags[,c(3,1,2,4,5)]
+  df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
     df.flags <- NA
   } # End flags processing chunk
