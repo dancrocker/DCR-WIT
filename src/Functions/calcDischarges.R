@@ -28,15 +28,16 @@ rm(con)
 now <- format(Sys.time(), "%Y-%m-%d")
 ratings$End[is.na(ratings$End)] <- now
 # Pull stage records that need to get converted to discharge - use this df at the end of script to merge Q records with df_wq
+# stages <- ToCalc
 stages <- stages %>%
   mutate(UniqueID = str_replace(stages$UniqueID,pattern = "_HT","_QCFS"))
-HOBOcalc <- stages[!stages$Location %in% c("MD04","MD07","MD69"),]
+HOBOcalc <- stages[!stages$Location %in% c("MD04","MD07","MD69"),] # NOT THE USGS GAUGES
 USGScalc <- stages[stages$Location %in% c("MD04","MD07","MD69"),]
 count <- 0
 if(nrow(HOBOcalc) > 0){
   count <- 1
     # Create a working df for HOBO discharges
-    df_Q <- select(HOBOcalc, c(4,17,27,28)) %>%
+    df_Q <- select(HOBOcalc, c("Location","ResultReported","SampleDateTime","UniqueID")) %>%
       dplyr::rename( "Stage_ft" = ResultReported) %>%
       mutate(ratingNo = 0, part = 0, q_cfs = 0)
     

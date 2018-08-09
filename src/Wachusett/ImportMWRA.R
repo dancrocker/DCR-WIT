@@ -244,10 +244,10 @@ FLAG <- function(x) {
 df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.numeric
+df.wq$StormSampleN <- NA %>% as.numeric()
 
 ### Importdate (Date)
-df.wq$ImportDate <- today()
+df.wq$ImportDate <- Sys.Date()
 
 ######################################
 # REMOVE ANY PRELIMINARY DATA     ###
@@ -300,42 +300,62 @@ df.wq$ID <- seq.int(nrow(df.wq)) + ID.max.wq
 }
 df.wq$ID <- setIDs()
 # Flags
+
 # First make sure there are flags in the dataset
 setFlagIDs <- function(){
-  if (all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
-  query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
-  # Get current max ID
-  if(is.na(query.flags)) {
-    query.flags <- 0
-  } else {
-    query.flags <- query.flags
-  }
-  ID.max.flags <- as.numeric(unlist(query.flags))
-  rm(query.flags)
-
+  if(all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
   # Split the flags into a separate df and assign new ID
   df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID) %>%
+    rename("SampleID" = ID) %>%
     drop_na()
+  fc <- 1
+  } else {
+    df.flags <- NULL
+    fc <- 0
+  }
   # Get discharge flags (if any)
+  #### Need to deal with condition where there are no regular flags in df.wq, but there are discharge flags
+  #### This part needs to go above the SET ID function 
   if(nrow(ToCalc) > 0){
       if(!is.na(df_QFlags)){
         df_QFlags <-  df_QFlags %>%
-          mutate(SampleFlag_ID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
+          mutate(SampleID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
           select(-UNQID)
-        df.flags <- bind_rows(df.flags,df_QFlags)
+        fc <- fc + 2
       }
   }
-  ### ID flags
-  df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-  df.flags$DataTableName <- ImportTable
-  df.flags$DateFlagged <-  Sys.Date()
-  df.flags$ImportStaff <-  username
-
-  # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-  df.flags <- df.flags[,c(3,4,1,2,5,6)]
+  if(fc == 1){
+    df.flags <- df.flags
+  } else {
+    if(fc == 3){
+      df.flags <- bind_rows(df.flags,df_QFlags)
+    } else {
+      df.flags <- NULL
+    }
+  }
+      
+  if(!is.null(df.flags)){
+      query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
+      # Get current max ID
+      if(is.na(query.flags)) {
+        query.flags <- 0
+      } else {
+        query.flags <- query.flags
+      }
+      ID.max.flags <- as.numeric(unlist(query.flags))
+      rm(query.flags)
+      
+      
+      ### ID flags
+      df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
+      df.flags$DataTableName <- ImportTable
+      df.flags$DateFlagged <-  Sys.Date()
+      df.flags$ImportStaff <-  username
+    
+      # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
+      df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
-    df.flags <- NA
+    df.flags <- NULL
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
@@ -384,7 +404,7 @@ return(dfs)
 # Write data to Database #
 ##########################
 
-IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 # df.flags is an optional argument
 
   con <-  odbcConnectAccess(filename.db)
@@ -398,7 +418,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
   # Flag data
-   if (!is.null(nrow(df.flags)) == TRUE){ # Check and make sure there is flag data to import
+   if (!is.null(df.flags)){ # Check and make sure there is flag data to import
     sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
   }
