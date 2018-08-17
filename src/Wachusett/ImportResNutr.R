@@ -268,16 +268,17 @@ setFlagIDs <- function(){
     # Split the flags into a separate df and assign new ID
 
     df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-      rename("SampleFlag_ID" = ID) %>%
+      rename("SampleID" = ID) %>%
       drop_na()
 
     ### ID flags
     df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
+    df.flags$DataTableName <- ImportTable
     df.flags$DateFlagged = today()
     df.flags$ImportStaff = Sys.getenv("USERNAME")
 
     # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-    df.flags <- df.flags[,c(3,1,2,4,5)]
+    df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
     df.flags <- NA
   } # End flags processing chunk
