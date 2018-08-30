@@ -294,7 +294,7 @@ df.wq$ID <- setIDs()
 
 setFlagIDs <- function(){
 
-  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblSampleFlagIndex")
+  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblTribFlagIndex")
   # Get current max ID
   if(is.na(query.flags)) {
     query.flags <- 0
@@ -386,7 +386,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
   # Flag data - must have flags since this is preliminary data
-    sqlSave(con, df.flags, tablename = "tblSampleFlagIndex", append = T,
+    sqlSave(con, df.flags, tablename = "tblTribFlagIndex", append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
 
   # Disconnect from db and remove connection obj
