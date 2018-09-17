@@ -328,7 +328,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
       # }
       ### ID flags
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-      ds.flags$DataTableName <- ImportTable
+      df.flags$DataTableName <- ImportTable
       df.flags$DateFlagged <-  Sys.Date()
       df.flags$ImportStaff <-  Sys.getenv("USERNAME")
       
