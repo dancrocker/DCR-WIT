@@ -317,15 +317,15 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
       df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
         rename("SampleFlag_ID" = ID) %>%
         drop_na()
-      # Get discharge flags (if any)
-      if(nrow(ToCalc) > 0){
-        if(!is.na(df_QFlags)){
-          df_QFlags <-  df_QFlags %>%
-            mutate(SampleFlag_ID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
-            select(-UNQID)
-          df.flags <- bind_rows(df.flags,df_QFlags)
-        }
-      }
+      # # Get discharge flags (if any)
+      # if(nrow(ToCalc) > 0){
+      #   if(!is.na(df_QFlags)){
+      #     df_QFlags <-  df_QFlags %>%
+      #       mutate(SampleFlag_ID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
+      #       select(-UNQID)
+      #     df.flags <- bind_rows(df.flags,df_QFlags)
+      #   }
+      # }
       ### ID flags
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
       ds.flags$DataTableName <- ImportTable
