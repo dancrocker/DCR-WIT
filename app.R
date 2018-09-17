@@ -426,7 +426,7 @@ server <- function(input, output, session) {
             NewCount <- actionCount() + 1
             actionCount(NewCount)
             print(paste0("Action Count was ", actionCount()))
-            # ImportEmail()
+            ImportEmail()
           }
   })
 
