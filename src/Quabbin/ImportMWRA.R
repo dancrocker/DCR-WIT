@@ -149,20 +149,20 @@ df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%
 #   Calculate Discharges  #
 ###########################
 
-ratings <- dbReadTable(con, "tblRatings")
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
-if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
-  # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
-  Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
-  # Extract the 2 dfs out of the list
-  df_Q <- Q_dfs$df_Q
-  df_QFlags <- Q_dfs$df_QFlags
-  df.wq <- bind_rows(df.wq,df_Q)
-  # Merge in Discharge Records
-} else {
-  print("No stage records available for discharge calculations")
-}
+# ratings <- dbReadTable(con, "tblRatings")
+# ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
+# if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
+#   # call function in separate script to create df of discharges and df of flags to bind to main dfs
+#   source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
+#   Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
+#   # Extract the 2 dfs out of the list
+#   df_Q <- Q_dfs$df_Q
+#   df_QFlags <- Q_dfs$df_QFlags
+#   df.wq <- bind_rows(df.wq,df_Q)
+#   # Merge in Discharge Records
+# } else {
+#   print("No stage records available for discharge calculations")
+# }
 ###########################
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
