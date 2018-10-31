@@ -26,6 +26,10 @@ ipak <- function(pkg){
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
               "sendmailR", "data.table", "dataRetrieval","httpuv")
+
+# Envoke every so often to update packages
+update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = packages, ask = F)
+
 # Load-Install Packages
 ipak(packages)
 
