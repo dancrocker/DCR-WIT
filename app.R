@@ -28,7 +28,7 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "tidyverse", "RODBC",
               "sendmailR", "data.table", "dataRetrieval","httpuv")
 
 # Envoke every so often to update packages
-update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = packages, ask = F)
+update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
 # Load-Install Packages
 ipak(packages)
