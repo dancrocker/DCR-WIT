@@ -25,7 +25,7 @@ ipak <- function(pkg){
 }
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval")
+              "sendmailR", "data.table", "dataRetrieval","httpuv")
 # Load-Install Packages
 ipak(packages)
 
