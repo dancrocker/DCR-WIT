@@ -417,9 +417,20 @@ server <- function(input, output, session) {
                                 filename.db = filename.db(),
                                 processedfolder = processedfolder(),
                                 ImportTable = ImportTable(),
-                                ImportFlagTable = ImportFlagTable()),
-                    error = function(e) e)
-
+                                ImportFlagTable = ImportFlagTable())
+                    ,
+                    error=function(cond) {
+                      message(paste("There was an error, data not imported...\n", cond))
+                      return(NA)
+                    },
+                    warning=function(cond) {
+                      message(paste("Import process completed with warnings...\n", cond))
+                      return(NULL)
+                    },
+                    finally={
+                      message(paste("Import Process Complete"))
+                    }
+                  )
           ImportFailed <- any(class(out) == "error")
 
           if (ImportFailed == TRUE){
@@ -434,7 +445,7 @@ server <- function(input, output, session) {
           }
   })
 
-  # Function to send ImportEmail
+  ### Function to send ImportEmail
   ImportEmail <- function() {
     out <- tryCatch(
       message("Trying to send email"),
@@ -454,7 +465,7 @@ server <- function(input, output, session) {
         return(NULL)
       },
       finally={
-        message(paste("Import Process Complete"))
+        message(paste("Import email was sent successfully"))
       }
     )
     return(out)
