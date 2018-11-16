@@ -41,10 +41,12 @@ dep2 <- as.numeric(df.wq[3,7])
 
 # Remove unwanted columns
 df.wq <- df.wq  %>% 
-  select(c(1,4,7)) 
+  select(c(1,4,7))  
 
-# Rename Columns using applicable row values and then remove the first row and last rows
-names(df.wq) <- unlist(df.wq[6,])
+
+# Rename Columns and then remove the first row and last rows
+names(df.wq) <- c("Taxa","Density1", "Density2")
+
 df.wq <- df.wq[-1:-7,]
 df.wq <- df.wq[-c(60:64),]
 
