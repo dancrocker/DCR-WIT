@@ -23,9 +23,9 @@ ipak <- function(pkg){
     install.packages(new.pkg, dependencies = TRUE, repos="http://cran.rstudio.com/")
   sapply(pkg, require, character.only = TRUE)
 }
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval","httpuv")
+              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang")
 
 # Envoke every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
