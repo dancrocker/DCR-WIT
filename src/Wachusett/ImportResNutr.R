@@ -120,6 +120,9 @@ df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 
+# Recode Staff Gauge Depth to Water Depth 
+df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
+
 # Fix the Parameter names  - change from MWRA name to ParameterName
 params <- dbReadTable(con,"tblParameters")
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
