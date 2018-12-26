@@ -32,10 +32,10 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyverse",
 
 # Load-Install Packages
 ipak(packages)
-
+odbcListDrivers()
 # Connect to db for queries below
 con2 <- dbConnect(odbc::odbc(),
-                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                              paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
 #Set user info
