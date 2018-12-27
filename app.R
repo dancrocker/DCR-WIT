@@ -32,7 +32,7 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyverse",
 
 # Load-Install Packages
 ipak(packages)
-odbcListDrivers()
+
 # Connect to db for queries below
 con2 <- dbConnect(odbc::odbc(),
                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
