@@ -23,7 +23,7 @@ ipak <- function(pkg){
     install.packages(new.pkg, dependencies = TRUE, repos="http://cran.rstudio.com/")
   sapply(pkg, require, character.only = TRUE)
 }
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
               "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang")
 
