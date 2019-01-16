@@ -268,7 +268,7 @@ x <- df.wq$ResultReported
   df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.numeric
+df.wq$StormSampleN <- NA %>% as.character()
 
 ### Importdate (Date)
 df.wq <- df.wq %>% mutate(ImportDate = today())
