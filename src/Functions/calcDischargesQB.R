@@ -14,7 +14,7 @@
   library(DBI)
   library(lubridate)
   library(magrittr)
-  library(dataRetrieval)
+  # library(dataRetrieval)
 
 
 calcQ <- function(filename.db, stages) {
