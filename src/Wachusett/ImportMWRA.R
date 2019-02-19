@@ -128,6 +128,9 @@ df.wq <- filter(df.wq, !is.na(ResultReported)) %>%  # Filter out any sample with
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
 df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
+
+# Need to generate a warning here if any status is X  - which means the results were tossed out and not approved... 
+
 # Fix the Location names
 df.wq$Location %<>%
   gsub("WACHUSET-","", .) %>%
@@ -153,7 +156,7 @@ ratings <- dbReadTable(con, "tblRatings")
 ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
+  source(paste0(getwd(),"/src/Functions/calcDischargesQB.R"))
   Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
   # Extract the 2 dfs out of the list
   df_Q <- Q_dfs$df_Q
