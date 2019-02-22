@@ -3,7 +3,7 @@
 #     Description: This script is called from an import function with stage values - it uses rating information to calculate
 #                   discharges for each stage record
 #     Written by: Dan Crocker
-#     Last Update: February2019
+#     Last Update: February 2019
 #
 ##############################################################################################################################
 
@@ -14,9 +14,9 @@
   library(DBI)
   library(lubridate)
   library(magrittr)
-  # library(dataRetrieval)
+  # library(dataRetrieval) Not needed yet
 
-
+# stages <- ToCalc
 calcQ <- function(filename.db, stages) {
 # Set odbc connection  and get the rating table
 con <-  odbcConnectAccess(filename.db)
@@ -82,8 +82,8 @@ if(nrow(HOBOcalc) > 0){
       }
     }
     
-    df_Q$part <- mapply(part,x,y) %>% as.numeric()
-    
+    # df_Q$part <- mapply(part,x,y) %>% as.numeric()
+    df_Q$part <- map2(x,y, part) %>% as.numeric()
     # Create a list to hold records for Below Rating Curve Values
     # Get number of records in dataset:
     Nrecs <- as.numeric(length(df_Q$SampleDateTime))
@@ -107,7 +107,7 @@ if(nrow(HOBOcalc) > 0){
       if(df_Q$Stage_ft[i] < minstage) { # Stage is below the rating curve (PZF) assign flow of zero and move to next record
         df_Q$q_cfs[i] <- 0
         BRC_Flags[[j]] <- df_Q$UniqueID[i] #
-        j <- j + 1
+        j <- j + 1 # Change the list slot to the next one
         next
       } else {
         if(df_Q$Stage_ft[i] > maxstage) { # Stage is above the rating curve and cannot be calculated -
@@ -134,14 +134,14 @@ if(nrow(HOBOcalc) > 0){
         n <- paste0("n", df_Q$part[i])
       }
       
-    if(df_Q$part[i] > 2){ ### Then the v-notch is full and the rectangular portion of the equation must be used. 
-       vnotchQ <- findq(stage = df_Q$Stage_ft[i], C = get(C), a = get(a), n = get(n))
+    if(df_Q$part[i] == 2){ ### Then the v-notch is full and the rectangular portion of the equation must be used. 
+       vnotchQ <- findq(stage = 2, C = c1, a = a1, n = n1) # Stage set to 2 because the v is full (1 ft height)
       ### Calculate the head of water in the rectangular portion of the weir
        H2 <- df_Q$Stage_ft[i] - 2
        ### Calculate the discharge in the rectangular portion of the weir 
       rectQ <-  c2 * a2 * H2^n2 
       df_Q$q_cfs[i] <- vnotchQ + rectQ
-      } else {
+      } else { # The stage is only in the v- portion of weir - use standard function
       # Use findq function to calculate discharge from each stage
       df_Q$q_cfs[i] <- findq(stage = df_Q$Stage_ft[i], C = get(C), a = get(a), n = get(n))
       }
