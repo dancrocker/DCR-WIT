@@ -38,13 +38,12 @@ con2 <- dbConnect(odbc::odbc(),
                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                              paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
-#Set user info
+# Set user info
 user <-  Sys.getenv("USERNAME")
 userdata <- readxl::read_xlsx(path = config[17])
 username <- paste(userdata$FirstName[userdata$Username %in% user],userdata$LastName[userdata$Username %in% user],sep = " ")
 useremail <- userdata$Email[userdata$Username %in% user]
 userlocation <- userdata$Location[userdata$Username %in% user]
-
 # Specify mail server
 MS <- config[5]
 

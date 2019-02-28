@@ -156,7 +156,7 @@ ratings <- dbReadTable(con, "tblRatings")
 ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischargesQB.R"))
+  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
   Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
   # Extract the 2 dfs out of the list
   df_Q <- Q_dfs$df_Q
