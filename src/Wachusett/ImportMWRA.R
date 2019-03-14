@@ -153,7 +153,7 @@ df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%
 ###########################
 
 ratings <- dbReadTable(con, "tblRatings")
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
+ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$Current == TRUE], Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
   source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
