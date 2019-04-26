@@ -719,10 +719,8 @@ server <- function(input, output, session) {
           # If data was successfully imported/flagged, then actionCount should be > 0; Update data files for WAVE App
 
     if (isolate(actionCount()) > 0) {
-            if (Sys.getenv("USERNAME") != "bkeevan") {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
               shell.exec(config[11])
-            }
           } else {
             print("Action Count was 0, data not modified in databases; New .rds files will not be generated")
           }
