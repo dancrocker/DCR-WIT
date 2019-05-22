@@ -50,10 +50,10 @@ df.wq <- df.wq[,c(1:25)]
     # Send warning message to UI if TRUE
     stop("At least 1 column heading is unexpected.\n Check the file before proceeding")
   }
-  # # Check to see if there were any miscellaneous locations that did not get assigned a location
+  # Check to see if there were any miscellaneous locations that did not get assigned a location
   if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"),TRUE)) > 0) {
   #Send warning message to UI if TRUE
-    stop("There are unspecified (MISC) locations that need to be corrected before importing data")
+    warning("There are unspecified (MISC) - please review before importing data!")
   }
   # Check to see if there were any GENERAL locations that did not get assigned a location
   if (length(which(str_detect(df.wq$Name, "GENERAL-GEN"),TRUE)) > 0) {
