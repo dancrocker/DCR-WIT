@@ -25,14 +25,13 @@ ipak <- function(pkg){
 }
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang")
+              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders")
 
 # Envoke every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
 # Load-Install Packages
 ipak(packages)
-
 # Connect to db for queries below
 con2 <- dbConnect(odbc::odbc(),
                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
@@ -353,10 +352,16 @@ server <- function(input, output, session) {
 
   # Run the function to process the data and return 2 dataframes and path as list
   dfs <- eventReactive(input$process,{
+    showModal(busyModal(msg = "Processing data..."))
     source(scriptname(), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    PROCESS_DATA(file = input$file, rawdatafolder = rawdatafolder(), filename.db = filename.db(),
+    dfs <- PROCESS_DATA(file = input$file, rawdatafolder = rawdatafolder(), filename.db = filename.db(),
                  probe = input$probe, ImportTable = ImportTable(), ImportFlagTable = ImportFlagTable())
-  })
+    # hide("loading-content") # make the loading pane disappear
+    removeModal()
+    return(dfs)
+    })
+  
+  
 
   # Extract each dataframe
   df.wq <- reactive({
@@ -386,7 +391,9 @@ server <- function(input, output, session) {
   })
 
   # Text Output
-  output$text.process.status <- renderText({process.status()})
+  output$text.process.status <- renderText({
+    process.status()
+    })
 
   # Show import button and tables when process button is pressed
   # Use of req() later will limit these to only show when process did not create an error)
@@ -395,6 +402,19 @@ server <- function(input, output, session) {
     # show('table.process.wq')
     # show('table.process.flag')
   })
+  
+  busyModal <- function(msg){
+    modalDialog(
+      size = "s",
+      fluidPage(
+        useShinyjs(),
+        includeCSS("www/animate.min.css"),
+        includeCSS("www/animate.css"),
+        h2(class = "animated infinite pulse", msg)
+        )
+    )
+  }
+  
 
   ### Import Data
 
@@ -408,6 +428,7 @@ server <- function(input, output, session) {
 
   # Import Data - Run import_data function
   observeEvent(input$import, {
+    showModal(busyModal(msg = "Importing data..."))
     source(scriptname(), local = T)
     out <- tryCatch(IMPORT_DATA(df.wq = df.wq(),
                                 df.flags = df.flags(),
@@ -442,6 +463,7 @@ server <- function(input, output, session) {
             print(paste0("Action Count was ", actionCount()))
             ImportEmail()
           }
+          removeModal()
   })
 
   ### Function to send ImportEmail
@@ -473,8 +495,6 @@ server <- function(input, output, session) {
   # Hide import button and tables when import button is pressed (So one cannot double import same file)
   observeEvent(input$import, {
     hide('import')
-    #hide('table.process.wq')
-    #hide('table.process.flag')
   })
 
   # Create a delayed reactive to trigger input file change update after import
@@ -497,9 +517,10 @@ server <- function(input, output, session) {
   ### Table Outputs
 
   # Processed WQ Table - Only make table if processing is successful
+  
   output$table.process.wq <- renderDataTable({
     req(try(df.wq()))
-    df.wq()
+   df.wq()
   })
 
   # Processed Flag Table - Only make table if processing is successful
