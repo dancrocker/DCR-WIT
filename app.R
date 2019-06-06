@@ -49,7 +49,7 @@ MS <- config[5]
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) %>%
-  filter(ImportMethod == "Importer-R")
+  filter(ImportMethod %in% c("Importer-R", "TribTools"))
 } else {
   if (userlocation == "Quabbin") {
     datasets <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
@@ -97,7 +97,7 @@ ui <- tagList(
                   column(6,
                          wellPanel(
                            selectInput("datatype", h4("1. Select data type:"),
-                                       choices = datasets$DataType),
+                                       choices = datasets$DataType[datasets$ImportMethod == "Importer_R"]),
                            br()
                          )
                   ),
@@ -356,6 +356,7 @@ server <- function(input, output, session) {
     source(scriptname(), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
     dfs <- PROCESS_DATA(file = input$file, rawdatafolder = rawdatafolder(), filename.db = filename.db(),
                  probe = input$probe, ImportTable = ImportTable(), ImportFlagTable = ImportFlagTable())
+       
     # hide("loading-content") # make the loading pane disappear
     removeModal()
     return(dfs)
