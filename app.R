@@ -97,7 +97,7 @@ ui <- tagList(
                   column(6,
                          wellPanel(
                            selectInput("datatype", h4("1. Select data type:"),
-                                       choices = datasets$DataType[datasets$ImportMethod == "Importer_R"]),
+                                       choices = datasets$DataType[datasets$ImportMethod == "Importer-R"]),
                            br()
                          )
                   ),
