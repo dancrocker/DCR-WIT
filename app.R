@@ -635,9 +635,11 @@ server <- function(input, output, session) {
 
    # # Run the function to process
   df.manualflags <- eventReactive(input$processflags, {
+    showModal(busyModal(msg = "Processing flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
     PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
-  })
+    removeModal()
+     })
 
   # Processed Flag Table - Only make table if processing is successful
   output$table.manual.flag <- renderDataTable({
@@ -655,6 +657,7 @@ server <- function(input, output, session) {
 
   # Import Data - Run import_data function
   observeEvent(input$importFlags, {
+    showModal(busyModal(msg = "Imorting flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
@@ -673,6 +676,7 @@ server <- function(input, output, session) {
       print(actionCount())
       FlagEmail()
     }
+    removeModal()
   })
 
 # Function to send FlagEmail
