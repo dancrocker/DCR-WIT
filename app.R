@@ -658,7 +658,7 @@ server <- function(input, output, session) {
 
   # Import Data - Run import_data function
   observeEvent(input$importFlags, {
-    showModal(busyModal(msg = "Imorting flags..."))
+    showModal(busyModal(msg = "Importing flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
