@@ -48,8 +48,7 @@ MS <- config[5]
 
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
-  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) %>%
-  filter(ImportMethod %in% c("Importer-R", "TribTools"))
+  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
 } else {
   if (userlocation == "Quabbin") {
     datasets <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%

@@ -175,7 +175,7 @@ df_HOBO <- HOBOcalc %>%
 if(nrow(USGScalc) > 0){
 count <- count + 2
 # Create a working df
-qusgs <- select(USGScalc, c(4,27,28)) %>%
+qusgs <- select(USGScalc, c("Location","SampleDateTime","UniqueID")) %>%
   mutate(Discharge = 0)
 
 # Filter each location, and for each record, run the data retrieval query
@@ -206,7 +206,7 @@ for (j in seq_along(qusgs$SampleDateTime)) {
   if(date(qusgs$SampleDateTime[j]) < start){
     # There can be no discharge, move to the next one
     next
-  } else { # Run the query to match the
+  } else { # Run the query get the flows
     hg <- readNWISuv(siteNumbers = siteNo,
                      parameterCd = pCodes,
                      startDate = flowdate,
@@ -215,7 +215,7 @@ for (j in seq_along(qusgs$SampleDateTime)) {
       renameNWISColumns() # Convenience function to rename columns
   }
 
-  # Test it the query returned any results, if so, move on, if not, move to the next one
+  # Test if the query returned any results, if so, move on, if not, move to the next one
   if(length(hg$dateTime) < 1) {
     qusgs$Discharge[j] <- NA
     print(paste(qusgs$Location[j],qusgs$SampleDateTime[j]," -No discharge data available for period selected"))
