@@ -53,10 +53,10 @@ df.wq <- df.wq %>%
   select(-delcols) %>%
   slice(5:n()) 
 
-names(df.wq) <- LETTERS[seq( from = 1, to = ncol(df.wq))]  
+names(df.wq) <- LETTERS[seq(from = 1, to = ncol(df.wq))]  
 
 df.wq <- df.wq %>%
-  dplyr::filter(!is.na("A")) %>%
+  dplyr::filter(!is.na(`A`)) %>%
   add_row()
 
 # Count how many depths were sampled this day
