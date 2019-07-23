@@ -47,11 +47,16 @@ df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("AJ:AS"),  col_nam
 delcols <- as_vector(paste0(df.wq[9,]))
 delcols <- which(delcols == "0"|delcols == "NA")
 
-# Remove unwanted columns, discard first 4 rows, filter out empty rows (NA inf column 1), add a new row
+# Remove unwanted columns, discard first 4 rows, filter out empty rows (NA inf column A), add a new row
+
 df.wq <- df.wq %>%
   select(-delcols) %>%
-  slice(5:n()) %>%
-  filter(!is.na(X__1)) %>%
+  slice(5:n()) 
+
+names(df.wq) <- LETTERS[seq( from = 1, to = ncol(df.wq))]  
+
+df.wq <- df.wq %>%
+  dplyr::filter(!is.na("A")) %>%
   add_row()
 
 # Count how many depths were sampled this day
