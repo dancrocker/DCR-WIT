@@ -48,6 +48,7 @@ userdata <- readxl::read_xlsx(path = config[17])
 username <- paste(userdata$FirstName[userdata$Username %in% user],userdata$LastName[userdata$Username %in% user],sep = " ")
 useremail <- userdata$Email[userdata$Username %in% user]
 userlocation <- userdata$Location[userdata$Username %in% user]
+
 # Specify mail server
 MS <- config[5]
 
@@ -464,7 +465,6 @@ server <- function(input, output, session) {
                     },
                     finally={
                       message(paste("Import Process Complete ..."))
-                      print(msg)
                     }
                   )
     
@@ -484,7 +484,7 @@ server <- function(input, output, session) {
             ImportEmail()
           }
           removeModal()
-          if (length(which(df.wq()$Location=="MISC"))>0) {
+          if (length(which(df.wq()$Location =="MISC"))>0) {
             showModal(modalDialog(
               title = "MISC Sample(s) Imported",
               HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
