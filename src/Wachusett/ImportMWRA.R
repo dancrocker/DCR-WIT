@@ -122,12 +122,12 @@ df.wq$ResultReported <- as.character(df.wq$ResultReported)
 params <- dbReadTable(con,"tblParameters")
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
-# Fix the Unit names for chloride only  - change from MWRA name to ParameterUnits
-df.wq$Units[df.wq$Parameter == "Chloride"] <- params$ParameterUnits[match(df.wq$Parameter, params$ParameterName)]
-
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
-df.wq <- filter(df.wq, !is.na(ResultReported)) %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
-  filter(!is.na(Parameter))
+df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
+  filter(!is.na(Parameter),
+         !is.na(ResultReported),
+         Parameter == "Specific Conductance")
+
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
 df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
