@@ -122,8 +122,8 @@ df.wq$ResultReported <- as.character(df.wq$ResultReported)
 params <- dbReadTable(con,"tblParameters")
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
-# Fix the Unit names  - change from MWRA name to ParameterUnits
-df.wq$Units <- params$ParameterUnits[match(df.wq$Parameter, params$ParameterName)]
+# Fix the Unit names for chloride only  - change from MWRA name to ParameterUnits
+df.wq$Units[df.wq$Parameter == "Chloride"] <- params$ParameterUnits[match(df.wq$Parameter, params$ParameterName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
 df.wq <- filter(df.wq, !is.na(ResultReported)) %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
