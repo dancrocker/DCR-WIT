@@ -126,7 +126,7 @@ df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterM
 df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
   filter(!is.na(Parameter),
          !is.na(ResultReported),
-         Parameter == "Specific Conductance")
+         Parameter != "Specific Conductance")
 
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
