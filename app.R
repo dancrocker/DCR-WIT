@@ -370,25 +370,24 @@ server <- function(input, output, session) {
     return(dfs)
     })
   
-  
 
-  # Extract each dataframe
+### Extract each dataframe
   df.wq <- reactive({
-            dfs()[[1]]
+            dfs()$df.wq
         })
   path  <- reactive({
-            dfs()[[2]]
+            dfs()$path
         })
   df.flags  <- reactive({
-            dfs()[[3]]
+            dfs()$df.flags
         })
 
-  # Last File to be Processed
+### Last File to be Processed
   file.processed <- eventReactive(input$process, {
     input$file
   })
 
-  # Text for Process Data Error or Successful
+### Text for Process Data Error or Successful
   process.status <- reactive({
     if(input$file != file.processed()){
       " "
@@ -455,22 +454,22 @@ server <- function(input, output, session) {
                     error=function(cond) {
                       msg <<- paste("Import Failed - There was an error at ", Sys.time() ,
                                     "...\n ", cond)
-                      print(msg)
-                      return(NA)
+                      # print(msg)
+                      return(1)
                     },
                     warning=function(cond) {
                       msg <<- paste("Import process completed with warnings...\n", cond)
                       print(msg)
-                      return(NULL)
+                      return(2)
                     },
                     finally={
                       message(paste("Import Process Complete ..."))
                     }
                   )
     
-          ImportFailed <- is.na(out)
+          # ImportFailed <- is.na(out)
 
-          if (ImportFailed == TRUE){
+          if (out == 1){
             removeModal()
             print(msg)
             import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
@@ -504,14 +503,14 @@ server <- function(input, output, session) {
       ,
       error=function(cond) {
         message(paste("User cannot connect to SMTP Server, cannot send email", cond))
-        return(NA)
+        return(1)
       },
       warning=function(cond) {
         message(paste("Send mail function caused a warning, but was completed successfully", cond))
-        return(NULL)
+        return(2)
       },
       finally={
-        message(paste("Import email was sent successfully"))
+        message(paste("Email notification attempted"))
       }
     )
     return(out)
@@ -535,7 +534,7 @@ server <- function(input, output, session) {
     insertUI(
       selector = "#import",
       where = "afterEnd",
-      ui = h4(paste("Successful import of", nrow(df.wq()), "record(s) in", input$file, "to", input$datatype, "Database"))
+      ui = h4(paste(import_msg))
     )
   })
 
