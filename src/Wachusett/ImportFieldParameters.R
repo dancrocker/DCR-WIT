@@ -254,6 +254,16 @@ params <- dbReadTable(con,"tblParameters")
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
 df.wq <- filter(df.wq, !is.na(ResultReported)) # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
 
+# Fix the Location names
+df.wq$Location %<>%
+  gsub("WACHUSET-","", .) %>%
+  gsub("M754","MD75.4", .) %>% 
+  gsub("BMP1","FPRN", .) %>%
+  gsub("BMP2","FHLN", .) %>%
+  gsub("QUABBINT-","", .) %>%
+  gsub("QUABBIN-","", .)
+
+
 ######################
 #   Add new Columns  #
 ######################
