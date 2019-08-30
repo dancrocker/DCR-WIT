@@ -303,7 +303,7 @@ if (length(dupes) > 0){
   # Exit function and send a warning to userlength(dupes) # number of dupes
   stop(paste0("This data file contains ", length(dupes),
              " records that appear to be duplicates. Eliminate all duplicates before proceeding"))
-  #print(dupes) # Show the duplicate Unique IDs to user in Shiny
+  print(dupes) # Show the duplicate Unique IDs to user in Shiny
 }
 ### Make sure records are not already in DB
 
@@ -315,7 +315,7 @@ if (length(dupes2) > 0){
   # Exit function and send a warning to user
   stop(paste0("This data file contains ", length(dupes2),
               " records that appear to already exist in the database! Eliminate all duplicates before proceeding"))
-  #print(dupes2) # Show the duplicate Unique IDs to user in Shiny
+  print(dupes2) # Show the duplicate Unique IDs to user in Shiny
 }
 rm(Uniq)
 
