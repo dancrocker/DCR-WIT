@@ -91,7 +91,7 @@ if (all(colnames(data)!=expectedcolumns)){
     df$Units <- NA
     df$Units <- ifelse(df$Parameter=="Dissolved Oxygen","mg/L",
                 ifelse(df$Parameter=="pH","pH",
-                ifelse(df$Parameter=="Specific Conductance","umho/cm",
+                ifelse(df$Parameter=="Specific Conductance","uS/cm",
                 ifelse(df$Parameter=="Staff Gauge Height","ft",
                 ifelse(df$Parameter=="Water Temperature","Deg-C",
                 ifelse(df$Parameter=="Turbidity NTU","NTU",NA
