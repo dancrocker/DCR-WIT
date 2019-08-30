@@ -373,13 +373,13 @@ server <- function(input, output, session) {
 
 ### Extract each dataframe
   df.wq <- reactive({
-            dfs()$df.wq
+            dfs()[[1]]
         })
   path  <- reactive({
-            dfs()$path
+            dfs()[[2]]
         })
   df.flags  <- reactive({
-            dfs()$df.flags
+            dfs()[[3]]
         })
 
 ### Last File to be Processed
