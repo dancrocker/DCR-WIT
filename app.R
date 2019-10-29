@@ -379,7 +379,7 @@ server <- function(input, output, session) {
             dfs()[[2]]
         })
   df.flags  <- reactive({
-            dfs()[[3]]
+            unlist(dfs()[[3]])
         })
 
 ### Last File to be Processed

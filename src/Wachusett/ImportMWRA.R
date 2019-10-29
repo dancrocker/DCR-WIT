@@ -427,6 +427,8 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
    if (!is.null(df.flags)){ # Check and make sure there is flag data to import
     sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
+   } else {
+    print("There were no flags to import")
   }
 
   # Disconnect from db and remove connection obj
