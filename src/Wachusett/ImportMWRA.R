@@ -11,14 +11,14 @@
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed
-#     library(tidyverse)
-#     library(stringr)
-#     library(odbc)
-#     library(RODBC)
-#     library(DBI)
-#     library(lubridate)
-#     library(magrittr)
-#     library(readxl)
+    # library(tidyverse)
+    # library(stringr)
+    # library(odbc)
+    # library(RODBC)
+    # library(DBI)
+    # library(lubridate)
+    # library(magrittr)
+    # library(readxl)
 #
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -361,7 +361,7 @@ setFlagIDs <- function(){
       # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
       df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
-    df.flags <- NULL
+    df.flags <- list(NULL)
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
