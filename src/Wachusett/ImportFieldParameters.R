@@ -451,7 +451,7 @@ setFlagIDs <- function(){
     flag.col.order.wq <- dbListFields(con, ImportFlagTable)
     df.flags <-  df.flags[,flag.col.order.wq]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
-    df.flags <- NULL
+    df.flags <- list(NULL)
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
@@ -516,7 +516,9 @@ IMPORT_DATA <- function(df.wq, df.flags=NULL , path, file, filename.db, processe
    df.flags$DateFlagged <- as.Date(df.flags$DateFlagged, format ="%m/%d/%Y")
       sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
-  }
+    } else {
+      print("There were no flags to import")
+    }
   # Disconnect from db and remove connection obj
   odbcCloseAll()
   rm(con)
