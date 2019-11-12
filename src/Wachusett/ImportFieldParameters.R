@@ -2,7 +2,7 @@
 #     Title: ImportFieldParameters.R
 #     Description: This script will Format/Process/Import YSI, turbidity, and stage data
 #     Written by: Dan Crocker & Travis Drury
-#     Last Update: June 2019
+#     Last Update: November 2019
 #    This script will process and import Wachusett Turbidity data to the WQ Database
 #
 ##############################################################################################################################
@@ -109,6 +109,8 @@ if (all(colnames(data)!=expectedcolumns)){
                      timezone = "America/New_York")
     locations <- dbReadTable(con,"tblLocations")
     flowlocations <- filter(locations, !is.na(LocationFlow))
+    
+    df$SampleDateTime <- round_date(df$SampleDateTime,"minute")
     
     df$SampleDateTime <- ifelse(df$Location=="MD04",
                                 round_date(df$SampleDateTime,"10 minutes"),
