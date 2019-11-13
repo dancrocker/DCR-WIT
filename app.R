@@ -381,6 +381,10 @@ server <- function(input, output, session) {
   df.flags  <- reactive({
             unlist(dfs()[[3]])
         })
+  unmatchedtimes  <- reactive({
+                      dfs()[[4]]
+        })
+  
 
 ### Last File to be Processed
   file.processed <- eventReactive(input$process, {
