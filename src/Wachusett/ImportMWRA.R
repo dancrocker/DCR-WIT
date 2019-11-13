@@ -19,6 +19,7 @@
     # library(lubridate)
     # library(magrittr)
     # library(readxl)
+    # library(testthat)
 #
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -125,8 +126,7 @@ df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterM
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
 df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
   filter(!is.na(Parameter),
-         !is.na(ResultReported),
-         Parameter != "Specific Conductance")
+         !is.na(ResultReported))
 
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
@@ -314,9 +314,9 @@ setFlagIDs <- function(){
   df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
     rename("SampleID" = ID) %>%
     drop_na()
-  fc <- 1
+  fc <- 1 # Flag Count
   } else {
-    df.flags <- NULL
+    df.flags <- NA
     fc <- 0
   }
   # Get discharge flags (if any)
@@ -336,11 +336,11 @@ setFlagIDs <- function(){
     if(fc == 3){
       df.flags <- bind_rows(df.flags,df_QFlags)
     } else {
-      df.flags <- NULL
+      df.flags <- NA
     }
   }
       
-  if(!is.null(df.flags)){
+  if(class(df.flags) == "data.frame"){
       query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
       # Get current max ID
       if(is.na(query.flags)) {
@@ -361,7 +361,7 @@ setFlagIDs <- function(){
       # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
       df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
-    df.flags <- list(NULL)
+    df.flags <- NA
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
@@ -399,8 +399,8 @@ return(dfs)
 ########################################################################################################
 # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, ImportTable = ImportTable, ImportFlagTable = ImportFlagTable)
-#
-# # Extract each element needed
+# #
+# # # Extract each element needed
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
@@ -424,9 +424,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
   # Flag data
-   if (!is.null(df.flags)){ # Check and make sure there is flag data to import
+   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
     sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F)
+            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
    } else {
     print("There were no flags to import")
   }
