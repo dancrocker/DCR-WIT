@@ -397,14 +397,26 @@ server <- function(input, output, session) {
     }else{
       removeModal()
       paste0('The file "', input$file, '" was successfully processed')
+      
+      # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
+      if (nrow(unmatchedtimes)>0) {
+        showModal(modalDialog(
+          title = "Sample(s) with unmatched times processed.",
+          HTML("<h4>Data processing was successful.<br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>UniqeIDs are presented below and have been printed to the log.</h4><br/>"),
+          print(unmatchedtimes[c("UniqueID")],right=FALSE)
+        ))
+      }
     }
   })
+
 
   # Text Output
   output$text.process.status <- renderText({
     process.status()
     })
+  
 
+  
   # Show import button and tables when process button is pressed
   # Use of req() later will limit these to only show when process did not create an error)
   observeEvent(input$process, {
@@ -426,7 +438,6 @@ server <- function(input, output, session) {
     )
   }
   
- 
 ### Import UI ####
 
   # Import Action Button - Will only be shown when a file is processed successfully

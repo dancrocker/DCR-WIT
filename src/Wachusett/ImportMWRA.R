@@ -11,15 +11,15 @@
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed
-    # library(tidyverse)
-    # library(stringr)
-    # library(odbc)
-    # library(RODBC)
-    # library(DBI)
-    # library(lubridate)
-    # library(magrittr)
-    # library(readxl)
-#
+# library(tidyverse)
+# library(stringr)
+# library(odbc)
+# library(RODBC)
+# library(DBI)
+# library(lubridate)
+# library(magrittr)
+# library(readxl)
+# 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
 #############################
@@ -196,6 +196,26 @@ Eliminate all duplicates before proceeding.",
              "The duplicate records include:", paste(head(dupes2$UniqueID, 15), collapse = ", ")), call. = FALSE)
 }
 rm(Uniq)
+
+### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
+
+unmatchedtimes <- df.wq[NULL,names(df.wq)]
+mindatecheck <- min(df.wq$SampleDateTime)
+databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))
+
+for (i in 1:nrow(df.wq)){
+    if ((df.wq$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.wq$Location[i])$SampleDateTime) == FALSE){
+    unmatchedtimes <- bind_rows(unmatchedtimes,df.wq[i,])
+    }}
+
+rm(mindatecheck, databasetimes)
+
+### Print unmatchedtimes to log, if present
+if (nrow(unmatchedtimes)>0){
+  print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
+  print(unmatchedtimes[c("UniqueID","ResultReported")],print.gap=4,right=FALSE)
+}
+
 
 ### DataSource
 df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
@@ -388,6 +408,7 @@ dfs <- list()
 dfs[[1]] <- df.wq
 dfs[[2]] <- path
 dfs[[3]] <- df.flags # Removed condition to test for flags and put it in the setFlagIDS() function
+dfs[[4]] <- unmatchedtimes # Samples with site/time combo not matching any record in the database
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
@@ -404,6 +425,7 @@ return(dfs)
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
+# unmatchedtimes <- dfs[[4]]
 
 ########################################################################################################
 ##########################
