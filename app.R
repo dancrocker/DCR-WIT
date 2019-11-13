@@ -30,7 +30,7 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders")
+              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat")
 
 # Envoke every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
@@ -379,7 +379,7 @@ server <- function(input, output, session) {
             dfs()[[2]]
         })
   df.flags  <- reactive({
-            unlist(dfs()[[3]])
+            dfs()[[3]]
         })
   unmatchedtimes  <- reactive({
                       dfs()[[4]]
