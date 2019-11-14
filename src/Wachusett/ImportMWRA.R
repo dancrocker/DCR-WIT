@@ -11,17 +11,15 @@
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed
-<<<<<<< HEAD
-# library(tidyverse)
-# library(stringr)
-# library(odbc)
-# library(RODBC)
-# library(DBI)
-# library(lubridate)
-# library(magrittr)
-# library(readxl)
-# 
-=======
+
+    # library(tidyverse)
+    # library(stringr)
+    # library(odbc)
+    # library(RODBC)
+    # library(DBI)
+    # library(lubridate)
+    # library(magrittr)
+    # library(readxl)
     # library(tidyverse)
     # library(stringr)
     # library(odbc)
@@ -32,7 +30,7 @@
     # library(readxl)
     # library(testthat)
 #
->>>>>>> cc979a8e60582e3d2cf4c0cffd706c516383ffa2
+
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
 #############################
@@ -209,26 +207,6 @@ Eliminate all duplicates before proceeding.",
 }
 rm(Uniq)
 
-### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
-
-unmatchedtimes <- df.wq[NULL,names(df.wq)]
-mindatecheck <- min(df.wq$SampleDateTime)
-databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))
-
-for (i in 1:nrow(df.wq)){
-    if ((df.wq$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.wq$Location[i])$SampleDateTime) == FALSE){
-    unmatchedtimes <- bind_rows(unmatchedtimes,df.wq[i,])
-    }}
-
-rm(mindatecheck, databasetimes)
-
-### Print unmatchedtimes to log, if present
-if (nrow(unmatchedtimes)>0){
-  print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
-  print(unmatchedtimes[c("UniqueID","ResultReported")],print.gap=4,right=FALSE)
-}
-
-
 ### DataSource
 df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
 
@@ -397,6 +375,35 @@ setFlagIDs <- function(){
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
+
+###########################################################################################################################################
+### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
+
+#Create empty dataframe
+unmatchedtimes <- df.wq[NULL,names(df.wq)]
+# Find earliest date in df.wq
+mindatecheck <- min(df.wq$SampleDateTime)
+# Retrieve all date/times from database from earliest in df.wq to present
+databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))
+# Bring in well location IDs
+wells.MWRA <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblWellsMetadata"))
+# Filter out well locations
+df.timecheck <- df.wq %>%
+  dplyr::filter(!df.wq$Location %in% wells.MWRA$LocationMWRA)
+
+#Loop adds row for every record without matching location/date/time in database
+for (i in 1:nrow(df.timecheck)){
+  if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+    unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
+  }}
+
+rm(mindatecheck, databasetimes)
+
+### Print unmatchedtimes to log, if present
+if (nrow(unmatchedtimes)>0){
+  print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
+  print(unmatchedtimes[c("ID","UniqueID","ResultReported")],print.gap=4,right=FALSE)
+}
 
 ##############################################################################################################################
 # Reformatting 2
