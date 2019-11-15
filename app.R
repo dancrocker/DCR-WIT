@@ -381,6 +381,10 @@ server <- function(input, output, session) {
   df.flags  <- reactive({
             dfs()[[3]]
         })
+  unmatchedtimes  <- reactive({
+                      dfs()[[4]]
+        })
+  
 
 ### Last File to be Processed
   file.processed <- eventReactive(input$process, {
@@ -396,15 +400,31 @@ server <- function(input, output, session) {
       geterrmessage()
     }else{
       removeModal()
+      # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
+      if (nrow(unmatchedtimes())>0) {
+        displaytable <- reactive({
+          unmatchedtimes()[c("ID","UniqueID")]
+        })
+        showModal(modalDialog(
+          title = "Warning: Sample(s) with unmatched times processed.",
+          HTML("<h4>Data processing was successful.<br/><br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>IDs and UniqeIDs for the samples with unmatched times are presented below and have also been printed to the WIT log.</h4><br/>"),
+          renderDataTable(displaytable())
+        ))
+      }      
       paste0('The file "', input$file, '" was successfully processed')
+      
+
     }
   })
+
 
   # Text Output
   output$text.process.status <- renderText({
     process.status()
     })
+  
 
+  
   # Show import button and tables when process button is pressed
   # Use of req() later will limit these to only show when process did not create an error)
   observeEvent(input$process, {
@@ -426,7 +446,6 @@ server <- function(input, output, session) {
     )
   }
   
- 
 ### Import UI ####
 
   # Import Action Button - Will only be shown when a file is processed successfully
@@ -485,7 +504,7 @@ server <- function(input, output, session) {
           removeModal()
           if (length(which(df.wq()$Location =="MISC"))>0) {
             showModal(modalDialog(
-              title = "MISC Sample(s) Imported",
+              title = "Warning: MISC Sample(s) Imported",
               HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
             ))
           } 
