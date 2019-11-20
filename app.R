@@ -381,8 +381,11 @@ server <- function(input, output, session) {
   df.flags  <- reactive({
             dfs()[[3]]
         })
+  
+
   unmatchedtimes  <- reactive({
-                      dfs()[[4]]
+    req(ImportTable() == "tblWQALLDATA")
+         dfs()[[4]]
         })
   
 
@@ -401,7 +404,8 @@ server <- function(input, output, session) {
     }else{
       removeModal()
       # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
-      if (nrow(unmatchedtimes())>0) {
+      if (ImportTable() == "tblWQALLDATA") { ### only do this for trib MWRA data
+        if (nrow(unmatchedtimes())>0) {
         displaytable <- reactive({
           unmatchedtimes()[c("ID","UniqueID")]
         })
@@ -410,10 +414,10 @@ server <- function(input, output, session) {
           HTML("<h4>Data processing was successful.<br/><br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>IDs and UniqeIDs for the samples with unmatched times are presented below and have also been printed to the WIT log.</h4><br/>"),
           renderDataTable(displaytable())
         ))
-      }      
+        }
+      }
       paste0('The file "', input$file, '" was successfully processed')
       
-
     }
   })
 
