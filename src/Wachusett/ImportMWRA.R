@@ -386,10 +386,10 @@ mindatecheck <- min(df.wq$SampleDateTime)
 # Retrieve all date/times from database from earliest in df.wq to present
 databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))
 # Bring in well location IDs
-wells.MWRA <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblWellsMetadata"))
-# Filter out well locations
-df.timecheck <- df.wq %>%
-  dplyr::filter(!df.wq$Location %in% wells.MWRA$LocationMWRA)
+locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
+# Keep only locations of type "Tributary"
+df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
+rm(locations.tribs)
 
 #Loop adds row for every record without matching location/date/time in database
 for (i in 1:nrow(df.timecheck)){
