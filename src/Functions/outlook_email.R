@@ -18,9 +18,6 @@ library(RDCOMClient)
 
 OL_EMAIL <- function(to, cc = "", bcc = "", subject, body){
 
-  print(glue("to = {to}"))
-  print(glue("Subject = {subject}"))
-  print(glue("body = {body}"))  
 # Open Outlook
 Outlook <- COMCreate("Outlook.Application")
 
