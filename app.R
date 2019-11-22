@@ -30,8 +30,9 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat")
+              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "RDCOMClient", "glue")
 
+# install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
@@ -42,6 +43,9 @@ con2 <- dbConnect(odbc::odbc(),
                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                              paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
+
+source("src/Functions/outlook_email.R", local = T)
+
 # Set user info
 user <-  Sys.getenv("USERNAME")
 userdata <- readxl::read_xlsx(path = config[17])
@@ -300,8 +304,7 @@ server <- function(input, output, session) {
   })
   distro1 <- reactive({
     req(ds())
-    as.character(ds()$EmailList[1]) %>%
-      strsplit(", ")
+    as.character(ds()$EmailList[1])
   })
 
 ### FILE SELECTION ####
@@ -459,7 +462,7 @@ server <- function(input, output, session) {
                  label = paste("Import", file.processed(), "Data"),
                  width = '500px')
   })
-
+  
 ### Import Button ####  
   # Import Data - Run import_data function
   observeEvent(input$import, {
@@ -489,7 +492,7 @@ server <- function(input, output, session) {
                       message(paste("Import Process Complete ..."))
                     }
                   )
-    
+
           # ImportFailed <- is.na(out)
 
           if (out == 1){
@@ -511,19 +514,26 @@ server <- function(input, output, session) {
               title = "Warning: MISC Sample(s) Imported",
               HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
             ))
-          } 
+          }
   })
 
   ImportEmail <- function() {
     out <- tryCatch(
       message("Trying to send email"),
-      sendmail(from = paste0("<",useremail,">"),
-               to = distro1(),
-               subject = paste0("New Data has been Imported to a ", userlocation," Database"),
-               msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
-                            input$datatype, " | Filename = ", input$file),
-               control=list(smtpServer=MS))
-      ,
+      OL_EMAIL(to = distro1(), 
+           subject = paste0("New Data has been Imported to a ", userlocation," Database"),
+           body = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
+                         input$datatype, ": Filename = ", input$file)
+          ),
+      
+    ### SMTP METHOD (ONLY WORKS WHEN McAfee GROUP POLICY ALLOWS)  
+      # sendmail(from = paste0("<",useremail,">"),
+      #          to = distro1(),
+      #          subject = paste0("New Data has been Imported to a ", userlocation," Database"),
+      #          msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
+      #                       input$datatype, " | Filename = ", input$file),
+      #          control=list(smtpServer=MS))
+    
       error=function(cond) {
         message(paste("User cannot connect to SMTP Server, cannot send email", cond))
         return(1)
@@ -604,8 +614,7 @@ server <- function(input, output, session) {
 
   distro2 <- reactive({
     # req(dsflags())
-    as.character(dsflags()$EmailList[1]) %>%
-      strsplit(", ")
+    as.character(dsflags()$EmailList[1])
   })
 
   flagsA <- reactive({
@@ -662,8 +671,7 @@ server <- function(input, output, session) {
     paste0(length(flagsC()), " records have been marked for flagging: ", list(flagsC()))
   })
 
-  output$D <-
-    renderText({
+  output$D <- renderText({
       req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
       paste0(length(flagRecords()), " records have been marked for flagging: ", list(flagRecords()))
     })
@@ -731,12 +739,17 @@ server <- function(input, output, session) {
   FlagEmail <- function() {
       out <- tryCatch({
           message("Trying to send email")
-          sendmail(from = paste0("<",useremail,">"),
-                   to = distro2(),
-                   subject = paste0("Data has been flagged in a ", userlocation," Database"),
-                   msg = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
-                                input$flagdatatype, ", with flag ", input$flag),
-                   control=list(smtpServer=MS))
+          OL_EMAIL(to = distro2(), 
+                 subject = paste0("Data has been flagged in a ", userlocation," Database"),
+                 body = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
+                               input$flagdatatype, ", with flag ", input$flag)
+          )
+          # sendmail(from = paste0("<",useremail,">"),
+          #          to = distro2(),
+          #          subject = paste0("Data has been flagged in a ", userlocation," Database"),
+          #          msg = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
+          #                       input$flagdatatype, ", with flag ", input$flag),
+          #          control=list(smtpServer=MS))
         },
         error=function(cond) {
           err <- print("User cannot connect to SMTP Server, cannot send email")
