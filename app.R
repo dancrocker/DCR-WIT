@@ -19,6 +19,7 @@
 ########################################################################.
 
 print(paste0("WIT App lauched at ", Sys.time()))
+
 ### Load packages
 
 ipak <- function(pkg){
@@ -33,7 +34,7 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
               "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "RDCOMClient", "glue")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
-# Envoke every so often to update packages
+# Envoke package update every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
 # Load-Install Packages
@@ -463,7 +464,7 @@ server <- function(input, output, session) {
                  width = '500px')
   })
   
-### Import Button ####  
+  ### Import Button ####  
   # Import Data - Run import_data function
   observeEvent(input$import, {
     showModal(busyModal(msg = "Importing data ..."))
@@ -491,7 +492,7 @@ server <- function(input, output, session) {
                     finally={
                       message(paste("Import Process Complete ..."))
                     }
-                  )
+    )
 
           # ImportFailed <- is.na(out)
 
@@ -820,5 +821,4 @@ server <- function(input, output, session) {
 } # end server function
 
 #combines the user interface and server (it's a must)
-shinyApp(ui = ui, server = server)
-
+shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE, port = 8887))
