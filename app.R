@@ -388,7 +388,7 @@ server <- function(input, output, session) {
   
 
   unmatchedtimes  <- reactive({
-    req(ImportTable() == "tblWQALLDATA")
+    req(ds() == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
          dfs()[[4]]
         })
   
@@ -408,8 +408,8 @@ server <- function(input, output, session) {
     }else{
       removeModal()
       # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
-      if (ImportTable() == "tblWQALLDATA") { ### only do this for trib MWRA data
-        if (nrow(unmatchedtimes())>0) {
+      if (ds() == "Trib-Transect (WATMDC-WATTRB-WATTRN)") { ### only do this for trib MWRA data
+        if (nrow(unmatchedtimes()) > 0) {
         displaytable <- reactive({
           unmatchedtimes()[c("ID","UniqueID")]
         })
