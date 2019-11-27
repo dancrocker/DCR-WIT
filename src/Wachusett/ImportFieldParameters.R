@@ -118,7 +118,7 @@ if (all(colnames(data)!=expectedcolumns)){
                                 round_date(df$SampleDateTime,"15 minutes"),
                                 df$SampleDateTime))
     
-    df$SampleDateTime <- as.POSIXct(df$SampleDateTime, origin="1970-01-01 00:00.00", format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = F)
+    df$SampleDateTime <- as.POSIXct(df$SampleDateTime, origin="1970-01-01 00:00:00", format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = F)
     
     dbDisconnect(con)
     rm(con)
@@ -400,7 +400,7 @@ setFlagIDs <- function(){
       drop_na()
     fc <- 1
   } else {
-    df.flags <- NULL
+    df.flags <- NA
     fc <- 0
   }
   # Get discharge flags (if any)
@@ -431,7 +431,7 @@ setFlagIDs <- function(){
   }}
   
   
-  if(!is.null(df.flags)){
+  if(class(df.flags) == "data.frame"){
     query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
     # Get current max ID
     if(is.na(query.flags)) {
@@ -453,7 +453,7 @@ setFlagIDs <- function(){
     flag.col.order.wq <- dbListFields(con, ImportFlagTable)
     df.flags <-  df.flags[,flag.col.order.wq]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
-    df.flags <- list(NULL)
+    df.flags <- NA
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
@@ -514,7 +514,7 @@ IMPORT_DATA <- function(df.wq, df.flags=NULL , path, file, filename.db, processe
   file.rename(filelist2, paste0(config[26],"/", filelist))
   
     # Flag data
-    if (!is.null(df.flags)){ # Check and make sure there is flag data to import
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
    df.flags$DateFlagged <- as.Date(df.flags$DateFlagged, format ="%m/%d/%Y")
       sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
