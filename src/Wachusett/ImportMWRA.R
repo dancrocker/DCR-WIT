@@ -381,24 +381,30 @@ df.flags <- setFlagIDs()
 
 #Create empty dataframe
 unmatchedtimes <- df.wq[NULL,names(df.wq)]
-# Find earliest date in df.wq
-mindatecheck <- min(df.wq$SampleDateTime)
-# Retrieve all date/times from database from earliest in df.wq to present
-databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))
-# Bring in well location IDs
+# Bring in tributary location IDs
 locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
 # Keep only locations of type "Tributary"
 df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
 rm(locations.tribs)
 
-#Loop adds row for every record without matching location/date/time in database
-for (i in 1:nrow(df.timecheck)){
-  if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
-    unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
-  }}
+# Only do the rest of the unmatched times check if there are tributary locations in data being processed
+if(nrow(df.timecheck)>0){
 
-rm(mindatecheck, databasetimes)
+  # Find earliest date in df.wq
+  mindatecheck <- min(df.wq$SampleDateTime)
+  # Retrieve all date/times from database from earliest in df.wq to present
+  databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
+    
+  #Loop adds row for every record without matching location/date/time in database
+  for (i in 1:nrow(df.timecheck)){
+    if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+      unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
+   }}
 
+  rm(mindatecheck, databasetimes)
+
+}  
+  
 ### Print unmatchedtimes to log, if present
 if (nrow(unmatchedtimes)>0){
   print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
