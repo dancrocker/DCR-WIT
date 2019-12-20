@@ -422,6 +422,11 @@ df.wq <- df.wq %>% select(-c(Description,
 col.order.wq <- dbListFields(con, ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
+# QC Test
+source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
+qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
+print(qc_message)
+
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
