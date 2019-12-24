@@ -29,7 +29,7 @@ Email[["to"]] =  to # semi-colon separated email addresses as string no <>
 Email[["cc"]] = cc
 Email[["bcc"]] = bcc
 Email[["subject"]] = subject
-Email[["body"]] = body
+Email[["htmlbody"]] = body
 
 # Send the message
 Email$Send()

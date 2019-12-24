@@ -470,6 +470,11 @@ df.wq <- df.wq %>% select(-c(Description, FlagCode))
 col.order.wq <- dbListFields(con, ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
+# QC Test
+source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
+qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
+print(qc_message)
+
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
@@ -515,12 +520,13 @@ IMPORT_DATA <- function(df.wq, df.flags=NULL , path, file, filename.db, processe
   
     # Flag data
   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-   df.flags$DateFlagged <- as.Date(df.flags$DateFlagged, format ="%m/%d/%Y")
+   df.flags$DateFlagged <- as.Date(df.flags$DateFlagged, format ="%Y-%m-%d")
       sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
     } else {
       print("There were no flags to import")
     }
+
   # Disconnect from db and remove connection obj
   odbcCloseAll()
   rm(con)
