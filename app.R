@@ -4,7 +4,7 @@
 #  DESCRIPTION: This Shiny App contains the "master" script for the Import Data app. The app contains a ui and server component
 #           and sources R scripts from the App folder
 #  AUTHOR(S): Dan Crocker, Nick Zinck, Travis Drury
-#  DATE LAST UPDATED: August 2019
+#  DATE LAST UPDATED: December 2019
 #  GIT REPO: DCR-WIT
 #  R version 3.5.3 (2019-03-11)  i386
 ##############################################################################.
@@ -386,14 +386,42 @@ server <- function(input, output, session) {
             dfs()[[3]]
         })
   
-
   unmatchedtimes  <- reactive({
-    req(ds() == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
+    req(ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
          dfs()[[4]]
         })
   
+  ### Import Email Message ####
+  qcpath <- reactive({
+    paste0("file:///\\\\env.govt.state.ma.us\\enterprise\\DCR-WestBoylston-WKGRP\\WatershedJAH\\EQStaff\\WQDatabase\\QC_Logfiles\\",ImportTable(),"_",gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")  
+  })
+  reactive_emailmsg <- reactiveVal(
+    ""
+  )
+  reactive_emailsubject <- reactiveVal(
+    ""
+  )  
+  observeEvent(input$import, {
+    if(file.exists(paste0(config[28],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+      reactive_emailmsg(
+        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p>
+               <p>Warning: Quality control outliers found in imported data. See QC Log <a href=",qcpath(),">",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
+        )
+      reactive_emailsubject(
+        paste0("New Data has been Imported to a ", userlocation," Database with QC Warning")
+      )
+    } else {
+      reactive_emailmsg(
+        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p></body>")
+      )
+      reactive_emailsubject(
+        paste0("New Data has been Imported to a ", userlocation," Database")
+      )
+    }
+  }, ignoreInit = TRUE)
+    
 
-### Last File to be Processed
+  ### Last File to be Processed
   file.processed <- eventReactive(input$process, {
     input$file
   })
@@ -408,7 +436,7 @@ server <- function(input, output, session) {
     }else{
       removeModal()
       # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
-      if (ds() == "Trib-Transect (WATMDC-WATTRB-WATTRN)") { ### only do this for trib MWRA data
+      if (ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)") { ### only do this for trib MWRA data
         if (nrow(unmatchedtimes()) > 0) {
         displaytable <- reactive({
           unmatchedtimes()[c("ID","UniqueID")]
@@ -522,10 +550,9 @@ server <- function(input, output, session) {
     out <- tryCatch(
       message("Trying to send email"),
       OL_EMAIL(to = distro1(), 
-           subject = paste0("New Data has been Imported to a ", userlocation," Database"),
-           body = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
-                         input$datatype, ": Filename = ", input$file)
-          ),
+               subject = reactive_emailsubject(),
+               body = reactive_emailmsg()
+      ),
       
     ### SMTP METHOD (ONLY WORKS WHEN McAfee GROUP POLICY ALLOWS)  
       # sendmail(from = paste0("<",useremail,">"),
