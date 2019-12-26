@@ -30,8 +30,8 @@ ipak <- function(pkg){
 }
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
-              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "RDCOMClient", "glue")
+              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -39,6 +39,8 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
 
 # Load-Install Packages
 ipak(packages)
+
+library(RDCOMClient)
 # Connect to db for queries below
 con2 <- dbConnect(odbc::odbc(),
                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
@@ -393,7 +395,7 @@ server <- function(input, output, session) {
   
   ### Import Email Message ####
   qcpath <- reactive({
-    paste0("file:///\\\\env.govt.state.ma.us\\enterprise\\DCR-WestBoylston-WKGRP\\WatershedJAH\\EQStaff\\WQDatabase\\QC_Logfiles\\",ImportTable(),"_",gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")  
+    paste0("file:///", str_replace_all(config[28],"/","\\\\"), ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
   })
   reactive_emailmsg <- reactiveVal(
     ""
