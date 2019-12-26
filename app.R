@@ -395,7 +395,7 @@ server <- function(input, output, session) {
   
   ### Import Email Message ####
   qcpath <- reactive({
-    paste0("file:///", str_replace_all(config[28],"/","\\\\"), ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
+    paste0("file:///", str_replace_all(config[28],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
   })
   reactive_emailmsg <- reactiveVal(
     ""
