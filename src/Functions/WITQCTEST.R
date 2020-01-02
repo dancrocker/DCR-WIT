@@ -34,17 +34,19 @@ QCCHECK <- function(df.qccheck,file,ImportTable){
  list2env(data ,.GlobalEnv)
  ### Remove data
  rm(data)  
- ### Round 
+
   
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
-statoutliers<-mutate(statoutliers, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, IQR=NA)
+statoutliers<-mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
 
 rangeoutliers <- df.qccheck[NULL,names(df.qccheck)]
 rangeoutliers<-mutate(rangeoutliers, HistoricalMin=NA, HistoricalMean=NA, HistoricalMax=NA)
 
+### Creates input dataframe without Staff Gauge Height for QC check against trib_wach_summary
+df.qccheckNOgauge <- dplyr::filter(df.qccheck,Parameter!="Staff Gauge Height")
 
-### Loop to compare results with historical min/max and percentiles
+### Loop to look for correct parameter/units, compare results with possible min/max, and then QC check against trib_wach_summary
 
 for (i in 1:nrow(df.qccheck)){
 
@@ -70,16 +72,18 @@ for (i in 1:nrow(df.qccheck)){
 
   } else {    
   
+    ### QC check against trib_wach_summary
+    
     # Only runs QC check on each result if the location/parameter/unit combination in the imported data is present in the summary RDS file, else will skip that record and proceed to next record
-  if (df.qccheck$Location[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$Site
-        & df.qccheck$Parameter[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$Parameter
-        & df.qccheck$Units[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$Units){
+  if (df.qccheckNOgauge$Location[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$Site
+        & df.qccheckNOgauge$Parameter[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$Parameter
+        & df.qccheckNOgauge$Units[i] %in% dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$Units){
       
     # Add to rangeoutliers if less than historical minimum for that site/parameter    
-  if (df.qccheck$FinalResult[i] < dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$Min){
-    rangeoutliers <- df.qccheck[i,] %>%
+  if (df.qccheckNOgauge$FinalResult[i] < dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$Min){
+    rangeoutliers <- df.qccheckNOgauge[i,] %>%
       cbind (trib_wach_summary %>%
-               filter (Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i]) %>%
+               filter (Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i]) %>%
                select (one_of(c("Min","Mean","Max"))) %>%
                rename (HistoricalMin = Min, 
                        HistoricalMean = Mean, 
@@ -88,10 +92,10 @@ for (i in 1:nrow(df.qccheck)){
   } else{
 
     # Add to rangeoutliers if greater than historical maximum for that site/parameter            
-    if (df.qccheck$FinalResult[i] > dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$Max){
-      rangeoutliers <- df.qccheck[i,] %>%
+    if (df.qccheckNOgauge$FinalResult[i] > dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$Max){
+      rangeoutliers <- df.qccheckNOgauge[i,] %>%
         cbind (trib_wach_summary %>%
-                 filter (Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i]) %>%
+                 filter (Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i]) %>%
                  select (one_of(c("Min","Mean","Max"))) %>%
                  rename (HistoricalMin = Min, 
                          HistoricalMean = Mean, 
@@ -100,28 +104,32 @@ for (i in 1:nrow(df.qccheck)){
     } else{
 
       # Add to statoutliers if FinalValue is less than (25th percentile - 1.5 times the interquartile range) that site/parameter 
-      if (df.qccheck$FinalResult[i] < ((dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$percentile25)-(1.5*(dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$IQR)))){
-        statoutliers <- df.qccheck[i,] %>%
+      if (df.qccheckNOgauge$FinalResult[i] < ((dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$percentile25)-(1.5*(dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$IQR)))){
+        statoutliers <- df.qccheckNOgauge[i,] %>%
           cbind (trib_wach_summary %>%
-                   filter (Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i]) %>%
-                   select (one_of(c("percentile25","Median","percentile75","IQR"))) %>%
-                   rename (Percentile25 = percentile25, 
+                   filter (Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i]) %>%
+                   select (one_of(c("Min","percentile25","Median","percentile75","Max","IQR"))) %>%
+                   rename (HistoricalMin = Min,
+                           Percentile25 = percentile25, 
                            HistoricalMedian = Median, 
                            Percentile75 = percentile75,
+                           HistoricalMax = Max,
                            IQR = IQR)) %>%
                   bind_rows (statoutliers)
       } else{
 
         # Add to statoutliers if FinalValue is greater than (75th percentile + 1.5 times the interquartile range) that site/parameter        
-        if (df.qccheck$FinalResult[i] > ((dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$percentile75)+(1.5*(dplyr::filter(trib_wach_summary,Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i])$IQR)))){
-          statoutliers <- df.qccheck[i,] %>%
+        if (df.qccheckNOgauge$FinalResult[i] > ((dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$percentile75)+(1.5*(dplyr::filter(trib_wach_summary,Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i])$IQR)))){
+          statoutliers <- df.qccheckNOgauge[i,] %>%
                     cbind (trib_wach_summary %>%
-                     filter (Site==df.qccheck$Location[i],Parameter==df.qccheck$Parameter[i],Units==df.qccheck$Units[i]) %>%
-                     select (one_of(c("percentile25","Median","percentile75","IQR"))) %>%
-                     rename (Percentile25 = percentile25, 
-                             HistoricalMedian = Median, 
-                             Percentile75 = percentile75,
-                             IQR = IQR)) %>%
+                     filter (Site==df.qccheckNOgauge$Location[i],Parameter==df.qccheckNOgauge$Parameter[i],Units==df.qccheckNOgauge$Units[i]) %>%
+                     select (one_of(c("Min","percentile25","Median","percentile75","Max","IQR"))) %>%
+                       rename (HistoricalMin = Min,
+                               Percentile25 = percentile25, 
+                               HistoricalMedian = Median, 
+                               Percentile75 = percentile75,
+                               HistoricalMax = Max,
+                               IQR = IQR)) %>%
                     bind_rows (statoutliers)
         }
       }}}}}}}}
@@ -136,6 +144,8 @@ for (i in 1:nrow(df.qccheck)){
 
   # If values exist outside historical range for site/parameter/units, print QC log file, create message for email.
   if (nrow(rangeoutliers)>0 & nrow(statoutliers)==0){
+    options(width=10000)
+    rangeoutliers <- rangeoutliers %>% arrange(ID)
     sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
     cat("WIT Quality Control Log\n\n")
     cat(paste0("Data imported at: ",Sys.time(),"\n"))
@@ -151,13 +161,15 @@ for (i in 1:nrow(df.qccheck)){
     
     # If values exist outside statistical range for site/parameter/units, print QC log file
     if (nrow(rangeoutliers)==0 & nrow(statoutliers)>0){
+      options(width=10000)
+      statoutliers <- statoutliers %>% arrange(ID)
       sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
       cat("WIT Quality Control Log\n\n")
       cat(paste0("Data imported at: ",Sys.time(),"\n"))
       cat(paste0("File: ",file,"\n"))
       cat(paste0("Database table: ",ImportTable,"\n\n"))
       cat(paste0(nrow(statoutliers)," potential statistical outlier(s) in imported data.\n\n"),append=T)
-      capture.output(print(statoutliers[c("ID","Location","SampleDateTime","Parameter","Units","FinalResult","Percentile25","HistoricalMedian","Percentile75")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+      capture.output(print(statoutliers[c("ID","Location","SampleDateTime","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
       cat("\n\n")
       sink()
       qc_message <- paste0("File ",file," processed at ",Sys.time(),". ",nrow(statoutliers)," potential statistical outlier(s) identified. See QC Log ",paste0(ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
@@ -166,6 +178,9 @@ for (i in 1:nrow(df.qccheck)){
       
       # If values exist outside both historical and statistical ranges for site/parameter/units, print QC log file
       if (nrow(rangeoutliers)>0 & nrow(statoutliers)>0){
+        options(width=10000)
+        rangeoutliers <- rangeoutliers %>% arrange(ID)
+        statoutliers <- statoutliers %>% arrange(ID)
         sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
         cat("WIT Quality Control Log\n\n")
         cat(paste0("Data imported at: ",Sys.time(),"\n"))
@@ -176,7 +191,7 @@ for (i in 1:nrow(df.qccheck)){
         sink()
         sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append = T)
         cat(paste0("\n\n",nrow(statoutliers)," potential statistical outlier(s) in imported data.\n\n"),append=T)
-        capture.output(print(statoutliers[c("ID","Location","SampleDateTime","Parameter","Units","FinalResult","Percentile25","HistoricalMedian","Percentile75")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+        capture.output(print(statoutliers[c("ID","Location","SampleDateTime","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
         cat("\n\n")
         sink()
         qc_message <- paste0("File ",file," processed at ",Sys.time(),". ",nrow(rangeoutliers)," record(s) outside historical range and ",nrow(statoutliers)," potential statistical outlier(s) identified. See QC Log ",paste0(ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
