@@ -74,9 +74,25 @@ if (userlocation == "Wachusett") {
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-flags <- dbReadTable(con2, "tblFlags") %>%
-  select(-3)
-flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
+if (try(file.access(config[1], mode = 4)) == 0) {
+  flags <- dbReadTable(con2, "tblFlags") %>%
+    select(-3)
+  flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
+} else {
+  ### Get df Flags from Dropbox rds files
+  df_flags_url <- config[30]
+  datadir <- paste0(getwd(), "/rds_files")
+  
+  GET(df_flags_url, 
+      write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
+  flags <- read_rds(paste0(datadir, "/df_flags.rds"))
+}
+
+### Get df Paramaeters from Dropbox rds files
+# df_wach_params_url <- config[31]
+# 
+# GET(df_wach_params_url, 
+#     write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
 
 # Disconnect and remove connection
 dbDisconnect(con2)

@@ -119,7 +119,18 @@ df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+
+if (try(file.access(config[1], mode = 4)) == 0) {
+  params <- dbReadTable(con,"tblParameters")
+} else {
+  ### Get df Paramaeters from Dropbox rds files
+  df_wach_params_url <- config[31]
+  
+  GET(df_wach_params_url,
+      write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
+  params <- read_rds(paste0(datadir, "/df_wach_param.rds"))
+}
+
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
