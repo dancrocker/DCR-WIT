@@ -92,8 +92,20 @@ con <- dbConnect(odbc::odbc(),
                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
+
 # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
-df_taxa_wach <- dbReadTable(con,"tbl_Taxa")
+if (try(file.access(config[1], mode = 4)) == 0) {
+  df_taxa_wach <- dbReadTable(con,"tbl_Taxa")
+} else {
+  ### Get df Flags from Dropbox rds files
+  df_taxa_wach_url <- config[32]
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
+  GET(df_taxa_wach_url, 
+      write_disk(paste0(datadir, "/df_taxa_wach.rds"), overwrite = T))
+  df_taxa_wach <- read_rds(paste0(datadir, "/df_taxa_wach.rds"))
+}
+
  unmatchedTaxa <- which(is.na(df_taxa_wach$ID[match(df.wq$Taxa, df_taxa_wach$Name)]))
 if (length(unmatchedTaxa) > 0){
   # Exit function and send a warning to user

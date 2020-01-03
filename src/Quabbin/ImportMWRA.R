@@ -125,7 +125,8 @@ if (try(file.access(config[1], mode = 4)) == 0) {
 } else {
   ### Get df Paramaeters from Dropbox rds files
   df_wach_params_url <- config[31]
-  
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
   GET(df_wach_params_url,
       write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
   params <- read_rds(paste0(datadir, "/df_wach_param.rds"))
