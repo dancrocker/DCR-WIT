@@ -82,7 +82,7 @@ if (try(file.access(config[1], mode = 4)) == 0) {
   ### Get df Flags from Dropbox rds files
   df_flags_url <- config[30]
   datadir <- paste0(getwd(), "/rds_files")
-  
+  dir.create(file.path(datadir), showWarnings = FALSE)
   GET(df_flags_url, 
       write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
   flags <- read_rds(paste0(datadir, "/df_flags.rds"))
