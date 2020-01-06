@@ -127,7 +127,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   
   # Get Parameters table  
   if (try(file.access(config[1], mode = 4)) == 0) {
-    params <- dbReadTable(con,"tblParameters")
+    df_param <- dbReadTable(con,"tblParameters")
   } else {
     ### Get df Paramaeters from Dropbox rds files
     df_wach_params_url <- config[31]
@@ -135,7 +135,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     dir.create(file.path(datadir), showWarnings = FALSE)
     GET(df_wach_params_url,
         write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
-    params <- read_rds(paste0(datadir, "/df_wach_param.rds"))
+    df_param <- read_rds(paste0(datadir, "/df_wach_param.rds"))
   }
 
   # UniqueID
