@@ -72,7 +72,7 @@ if (length(which(str_detect(df.wq$Location, "GENERAL-GEN"),TRUE)) > 0) {
 
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 #################################
@@ -125,7 +125,18 @@ df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+if (try(file.access(config[1], mode = 4)) == 0) {
+  params <- dbReadTable(con,"tblParameters")
+} else {
+  ### Get df Paramaeters from Dropbox rds files
+  df_wach_params_url <- config[31]
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
+  GET(df_wach_params_url,
+      write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
+  params <- read_rds(paste0(datadir, "/df_wach_param.rds"))
+}
+
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):

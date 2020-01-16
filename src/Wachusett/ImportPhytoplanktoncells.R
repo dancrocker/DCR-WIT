@@ -130,7 +130,7 @@ df.wq$Magnification <- as.numeric(as.character(df.wq$Magnification))
 ####Add new columns###
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 

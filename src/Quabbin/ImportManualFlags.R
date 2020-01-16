@@ -27,7 +27,7 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
 
    # Connect to db for queries below
   con <- dbConnect(odbc::odbc(),
-                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                   paste0("DBQ=", flag.db), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
   flag <- as.numeric(flag)

@@ -41,10 +41,12 @@ dep2 <- as.numeric(df.wq[3,7])
 
 # Remove unwanted columns
 df.wq <- df.wq  %>% 
-  select(c(1,4,7)) 
+  select(c(1,4,7))  
 
-# Rename Columns using applicable row values and then remove the first row and last rows
-names(df.wq) <- unlist(df.wq[6,])
+
+# Rename Columns and then remove the first row and last rows
+names(df.wq) <- c("Taxa","Density1", "Density2")
+
 df.wq <- df.wq[-1:-7,]
 df.wq <- df.wq[-c(60:64),]
 
@@ -87,11 +89,23 @@ df.wq$Depth_m <- as.numeric(df.wq$Depth_m)
 # Connect to db 
 
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
+
 # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
-df_taxa_wach <- dbReadTable(con,"tbl_Taxa")
+if (try(file.access(config[1], mode = 4)) == 0) {
+  df_taxa_wach <- dbReadTable(con,"tbl_Taxa")
+} else {
+  ### Get df Flags from Dropbox rds files
+  df_taxa_wach_url <- config[32]
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
+  GET(df_taxa_wach_url, 
+      write_disk(paste0(datadir, "/df_taxa_wach.rds"), overwrite = T))
+  df_taxa_wach <- read_rds(paste0(datadir, "/df_taxa_wach.rds"))
+}
+
  unmatchedTaxa <- which(is.na(df_taxa_wach$ID[match(df.wq$Taxa, df_taxa_wach$Name)]))
 if (length(unmatchedTaxa) > 0){
   # Exit function and send a warning to user

@@ -68,7 +68,7 @@ if (length(which(str_detect(df.wq$Location, "GENERAL-GEN"),TRUE)) > 0) {
 
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 
@@ -119,6 +119,9 @@ df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
+
+# Recode Staff Gauge Depth to Water Depth 
+df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
 params <- dbReadTable(con,"tblParameters")
@@ -268,16 +271,17 @@ setFlagIDs <- function(){
     # Split the flags into a separate df and assign new ID
 
     df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-      rename("SampleFlag_ID" = ID) %>%
+      rename("SampleID" = ID) %>%
       drop_na()
 
     ### ID flags
     df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
+    df.flags$DataTableName <- ImportTable
     df.flags$DateFlagged = today()
     df.flags$ImportStaff = Sys.getenv("USERNAME")
 
     # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-    df.flags <- df.flags[,c(3,1,2,4,5)]
+    df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
     df.flags <- NA
   } # End flags processing chunk

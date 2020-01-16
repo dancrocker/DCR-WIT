@@ -11,15 +11,26 @@
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed
-#     library(tidyverse)
-#     library(stringr)
-#     library(odbc)
-#     library(RODBC)
-#     library(DBI)
-#     library(lubridate)
-#     library(magrittr)
-#     library(readxl)
+
+    # library(tidyverse)
+    # library(stringr)
+    # library(odbc)
+    # library(RODBC)
+    # library(DBI)
+    # library(lubridate)
+    # library(magrittr)
+    # library(readxl)
+    # library(tidyverse)
+    # library(stringr)
+    # library(odbc)
+    # library(RODBC)
+    # library(DBI)
+    # library(lubridate)
+    # library(magrittr)
+    # library(readxl)
+    # library(testthat)
 #
+
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
 #############################
@@ -50,10 +61,10 @@ df.wq <- df.wq[,c(1:25)]
     # Send warning message to UI if TRUE
     stop("At least 1 column heading is unexpected.\n Check the file before proceeding")
   }
-  # # Check to see if there were any miscellaneous locations that did not get assigned a location
+  # Check to see if there were any miscellaneous locations that did not get assigned a location
   if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"),TRUE)) > 0) {
   #Send warning message to UI if TRUE
-    stop("There are unspecified (MISC) locations that need to be corrected before importing data")
+    warning("There are unspecified (MISC) - please review before importing data!")
   }
   # Check to see if there were any GENERAL locations that did not get assigned a location
   if (length(which(str_detect(df.wq$Name, "GENERAL-GEN"),TRUE)) > 0) {
@@ -65,7 +76,7 @@ df.wq <- df.wq[,c(1:25)]
 
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 
@@ -123,11 +134,16 @@ params <- dbReadTable(con,"tblParameters")
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
-df.wq <- filter(df.wq, !is.na(ResultReported)) %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
-  filter(!is.na(Parameter))
+df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
+  filter(!is.na(Parameter),
+         !is.na(ResultReported))
+
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
 df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
+
+# Need to generate a warning here if any status is X  - which means the results were tossed out and not approved... 
+
 # Fix the Location names
 df.wq$Location %<>%
   gsub("WACHUSET-","", .) %>%
@@ -150,7 +166,7 @@ df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%
 ###########################
 
 ratings <- dbReadTable(con, "tblRatings")
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
+ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$Current == TRUE], Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
   source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
@@ -244,10 +260,10 @@ FLAG <- function(x) {
 df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.numeric
+df.wq$StormSampleN <- NA %>% as.character()
 
 ### Importdate (Date)
-df.wq$ImportDate <- today()
+df.wq$ImportDate <- Sys.Date()
 
 ######################################
 # REMOVE ANY PRELIMINARY DATA     ###
@@ -300,45 +316,100 @@ df.wq$ID <- seq.int(nrow(df.wq)) + ID.max.wq
 }
 df.wq$ID <- setIDs()
 # Flags
+
 # First make sure there are flags in the dataset
 setFlagIDs <- function(){
-  if (all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
-  query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
-  # Get current max ID
-  if(is.na(query.flags)) {
-    query.flags <- 0
-  } else {
-    query.flags <- query.flags
-  }
-  ID.max.flags <- as.numeric(unlist(query.flags))
-  rm(query.flags)
-
+  if(all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
   # Split the flags into a separate df and assign new ID
   df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID) %>%
+    rename("SampleID" = ID) %>%
     drop_na()
+  fc <- 1 # Flag Count
+  } else {
+    df.flags <- NA
+    fc <- 0
+  }
   # Get discharge flags (if any)
+  #### Need to deal with condition where there are no regular flags in df.wq, but there are discharge flags
+  #### This part needs to go above the SET ID function 
   if(nrow(ToCalc) > 0){
       if(!is.na(df_QFlags)){
         df_QFlags <-  df_QFlags %>%
-          mutate(SampleFlag_ID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
+          mutate(SampleID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
           select(-UNQID)
-        df.flags <- bind_rows(df.flags,df_QFlags)
+        fc <- fc + 2
       }
   }
-  ### ID flags
-  df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-  ds.flags$DataTableName <- ImportTable
-  df.flags$DateFlagged <-  Sys.Date()
-  df.flags$ImportStaff <-  Sys.getenv("USERNAME")
-
-  # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-  df.flags <- df.flags[,c(3,4,1,2,5,6)]
+  if(fc == 1){
+    df.flags <- df.flags
+  } else {
+    if(fc == 3){
+      df.flags <- bind_rows(df.flags,df_QFlags)
+    } else {
+      df.flags <- NA
+    }
+  }
+      
+  if(class(df.flags) == "data.frame"){
+      query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
+      # Get current max ID
+      if(is.na(query.flags)) {
+        query.flags <- 0
+      } else {
+        query.flags <- query.flags
+      }
+      ID.max.flags <- as.numeric(unlist(query.flags))
+      rm(query.flags)
+      
+      
+      ### ID flags
+      df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
+      df.flags$DataTableName <- ImportTable
+      df.flags$DateFlagged <-  Sys.Date()
+      df.flags$ImportStaff <-  username
+    
+      # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
+      df.flags <- df.flags[,c(3,4,1,2,5,6)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
     df.flags <- NA
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
+
+###########################################################################################################################################
+### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
+
+#Create empty dataframe
+unmatchedtimes <- df.wq[NULL,names(df.wq)]
+# Bring in tributary location IDs
+locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
+# Keep only locations of type "Tributary"
+df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
+rm(locations.tribs)
+
+# Only do the rest of the unmatched times check if there are tributary locations in data being processed
+if(nrow(df.timecheck)>0){
+
+  # Find earliest date in df.wq
+  mindatecheck <- min(df.wq$SampleDateTime)
+  # Retrieve all date/times from database from earliest in df.wq to present
+  databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
+    
+  #Loop adds row for every record without matching location/date/time in database
+  for (i in 1:nrow(df.timecheck)){
+    if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+      unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
+   }}
+
+  rm(mindatecheck, databasetimes)
+
+}  
+  
+### Print unmatchedtimes to log, if present
+if (nrow(unmatchedtimes)>0){
+  print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
+  print(unmatchedtimes[c("ID","UniqueID","ResultReported")],print.gap=4,right=FALSE)
+}
 
 ##############################################################################################################################
 # Reformatting 2
@@ -357,11 +428,17 @@ df.wq <- df.wq %>% select(-c(Description,
 col.order.wq <- dbListFields(con, ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
+# QC Test
+source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
+qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
+print(qc_message)
+
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
 dfs[[2]] <- path
 dfs[[3]] <- df.flags # Removed condition to test for flags and put it in the setFlagIDS() function
+dfs[[4]] <- unmatchedtimes # Samples with site/time combo not matching any record in the database
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
@@ -373,18 +450,19 @@ return(dfs)
 ########################################################################################################
 # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, ImportTable = ImportTable, ImportFlagTable = ImportFlagTable)
-#
-# # Extract each element needed
+# #
+# # # Extract each element needed
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
+# unmatchedtimes <- dfs[[4]]
 
 ########################################################################################################
 ##########################
 # Write data to Database #
 ##########################
 
-IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 # df.flags is an optional argument
 
   con <-  odbcConnectAccess(filename.db)
@@ -398,9 +476,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
   # Flag data
-   if (!is.null(nrow(df.flags)) == TRUE){ # Check and make sure there is flag data to import
+   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
     sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F)
+            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
+   } else {
+    print("There were no flags to import")
   }
 
   # Disconnect from db and remove connection obj

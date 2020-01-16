@@ -65,7 +65,7 @@ df.wq <- df.wq[,c(1:25)]
 
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 
@@ -119,7 +119,19 @@ df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+
+if (try(file.access(config[1], mode = 4)) == 0) {
+  params <- dbReadTable(con,"tblParameters")
+} else {
+  ### Get df Paramaeters from Dropbox rds files
+  df_wach_params_url <- config[31]
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
+  GET(df_wach_params_url,
+      write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
+  params <- read_rds(paste0(datadir, "/df_wach_param.rds"))
+}
+
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
@@ -153,7 +165,7 @@ ratings <- dbReadTable(con, "tblRatings")
 ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc, Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
+  source(paste0(getwd(),"/src/Functions/calcDischargesQB.R"))
   Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
   # Extract the 2 dfs out of the list
   df_Q <- Q_dfs$df_Q
@@ -328,8 +340,8 @@ setFlagIDs <- function(){
   }
   ### ID flags
   df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
-  ds.flags$DataTableName <- ImportTable
-  df.flags$DateFlagged <-  Sys.Date()
+  df.flags$DataTableName <- ImportTable
+  df.flags$FlaggedDate <-  Sys.Date()
   df.flags$ImportStaff <-  Sys.getenv("USERNAME")
   
   # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags

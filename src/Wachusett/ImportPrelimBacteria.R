@@ -12,16 +12,16 @@
 
             # Load libraries needed
 
-            # library(tidyverse)
-            # library(stringr)
-            # library(odbc)
-            # library(RODBC)
-            # library(DBI)
-            # library(readxl)
-            # library(lubridate)
-            # library(magrittr)
-            # library(openxlsx)
-            # library(data.table)
+#             library(tidyverse)
+#             library(stringr)
+#             library(odbc)
+#             library(RODBC)
+#             library(DBI)
+#             library(readxl)
+#             library(lubridate)
+#             library(magrittr)
+#             library(openxlsx)
+#             library(data.table)
 
 
 ##############
@@ -33,7 +33,7 @@ PREP_DATA <- function(rawdatafolder){
 #These variables are the same as what is listed in datasets.xlsx
 rawdatafolder <- rawdatafolder
 
-# # Generate a list of the preliminary data files:
+### Generate a list of the preliminary data files:
 filelist <- grep(
   x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
   pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
@@ -52,7 +52,6 @@ filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of c
           # Sys.getenv("R_ZIPCMD", "zip")
           # Sys.getenv("PATH") # Rtools should be listed now
 ###################################################################################################
-
 # Read in all preliminary files and combine into 1
 tables <- lapply(filelist2, read.csv, header = TRUE)
 #a <-  tables[[3]]
@@ -112,7 +111,7 @@ options(scipen = 999) # Eliminate Scientific notation in numerical fields
 PREP_DATA(rawdatafolder = rawdatafolder)
 
   path <- paste0(rawdatafolder,"/", file)
-
+  # file <- "PrelimBacteria.xlsx"
 # Read in the data to a dataframe
 df.wq <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
   as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
@@ -147,7 +146,7 @@ df.wq <- df.wq[,c(1:25)]
 
 # Connect to db for queries below
 con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 
@@ -266,7 +265,7 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
   # df.wq$StormSample <- 0 %>%  as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.numeric
+df.wq$StormSampleN <- NA %>% as.character()
 
 ### Importdate (Date)
 df.wq <- df.wq %>% mutate(ImportDate = today())
@@ -294,7 +293,7 @@ df.wq$ID <- setIDs()
 
 setFlagIDs <- function(){
 
-  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblSampleFlagIndex")
+  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblTribFlagIndex")
   # Get current max ID
   if(is.na(query.flags)) {
     query.flags <- 0
@@ -317,11 +316,12 @@ setFlagIDs <- function(){
 
   ### ID flags
   df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
+  df.flags$DataTableName <- ImportTable
   df.flags$DateFlagged = today()
   df.flags$ImportStaff = Sys.getenv("USERNAME")
 
   # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-  df.flags <- df.flags[,c(3,1,2,4,5)]
+  df.flags <- df.flags[,c(3,4,1,2,5,6)]
 } # End set flags function
 df.flags <- setFlagIDs()
 
@@ -386,7 +386,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
   # Flag data - must have flags since this is preliminary data
-    sqlSave(con, df.flags, tablename = "tblSampleFlagIndex", append = T,
+    sqlSave(con, df.flags, tablename = "tblTribFlagIndex", append = T,
             rownames = F, colnames = F, addPK = F , fast = F)
 
   # Disconnect from db and remove connection obj

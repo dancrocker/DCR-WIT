@@ -209,7 +209,7 @@ ARC_Flags$FlagCode <- 111
 
   # Connect to db using odbc for queries below:
   con <- dbConnect(odbc::odbc(),
-                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                               paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                    timezone = "America/New_York")
 
@@ -235,7 +235,7 @@ ARC_Flags$FlagCode <- 111
         df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
         df.flags$DataTableName  <- "tblHOBO_DATA"
         df.flags$DateFlagged <-  Sys.Date()
-        df.flags$ImportStaff <-  Sys.getenv("USERNAME")
+        df.flags$ImportStaff <-  username
 
         # Reorder df.flags columns to match the database table exactly- the Date column is dropped
         df.flags <- df.flags[,c(4,5,3,2,6,7)]

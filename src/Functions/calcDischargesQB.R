@@ -1,9 +1,9 @@
 ##############################################################################################################################
-#     Title: calcDischarges.R
+#     Title: calcDischargesQB.R
 #     Description: This script is called from an import function with stage values - it uses rating information to calculate
 #                   discharges for each stage record
 #     Written by: Dan Crocker
-#     Last Update: April 2018
+#     Last Update: February 2019
 #
 ##############################################################################################################################
 
@@ -14,8 +14,9 @@
   library(DBI)
   library(lubridate)
   library(magrittr)
-  library(dataRetrieval)
+  # library(dataRetrieval) Not needed yet
 
+# stages <- ToCalc
 calcQ <- function(filename.db, stages) {
 # Set odbc connection  and get the rating table
 con <-  odbcConnectAccess(filename.db)
@@ -31,8 +32,9 @@ ratings$End[is.na(ratings$End)] <- now
 # stages <- ToCalc
 stages <- stages %>%
   mutate(UniqueID = str_replace(stages$UniqueID,pattern = "_HT","_QCFS"))
-HOBOcalc <- stages[!stages$Location %in% c("MD04","MD07","MD69"),] # NOT THE USGS GAUGES
-USGScalc <- stages[stages$Location %in% c("MD04","MD07","MD69"),]
+HOBOcalc <- stages[stages$Location %in% c("MD61","EBU"),] 
+# HOBOcalc <- stages[!stages$Location %in% c("MD04","MD07","MD69"),] # NOT THE USGS GAUGES
+# USGScalc <- stages[stages$Location %in% c("MD04","MD07","MD69"),]
 count <- 0
 if(nrow(HOBOcalc) > 0){
   count <- 1
@@ -80,8 +82,8 @@ if(nrow(HOBOcalc) > 0){
       }
     }
     
-    df_Q$part <- mapply(part,x,y) %>% as.numeric()
-    
+    # df_Q$part <- mapply(part,x,y) %>% as.numeric()
+    df_Q$part <- map2(x,y, part) %>% as.numeric()
     # Create a list to hold records for Below Rating Curve Values
     # Get number of records in dataset:
     Nrecs <- as.numeric(length(df_Q$SampleDateTime))
@@ -90,7 +92,6 @@ if(nrow(HOBOcalc) > 0){
     ARC_Flags <- vector("list", Nrecs)
     j <- 1 # Start the BRC list value at one
     k <- 1 # Start the ARClist value at one
-    
     
     # Define function to find Q:
     findq <- function(stage, C, n, a) {
@@ -106,7 +107,7 @@ if(nrow(HOBOcalc) > 0){
       if(df_Q$Stage_ft[i] < minstage) { # Stage is below the rating curve (PZF) assign flow of zero and move to next record
         df_Q$q_cfs[i] <- 0
         BRC_Flags[[j]] <- df_Q$UniqueID[i] #
-        j <- j + 1
+        j <- j + 1 # Change the list slot to the next one
         next
       } else {
         if(df_Q$Stage_ft[i] > maxstage) { # Stage is above the rating curve and cannot be calculated -
@@ -132,9 +133,19 @@ if(nrow(HOBOcalc) > 0){
         a <- paste0("a", df_Q$part[i])
         n <- paste0("n", df_Q$part[i])
       }
+      
+    if(df_Q$part[i] == 2){ ### Then the v-notch is full and the rectangular portion of the equation must be used. 
+       vnotchQ <- findq(stage = 2, C = c1, a = a1, n = n1) # Stage set to 2 because the v is full (1 ft height)
+      ### Calculate the head of water in the rectangular portion of the weir
+       H2 <- df_Q$Stage_ft[i] - 2
+       ### Calculate the discharge in the rectangular portion of the weir 
+      rectQ <-  c2 * a2 * H2^n2 
+      df_Q$q_cfs[i] <- vnotchQ + rectQ
+      } else { # The stage is only in the v- portion of weir - use standard function
       # Use findq function to calculate discharge from each stage
       df_Q$q_cfs[i] <- findq(stage = df_Q$Stage_ft[i], C = get(C), a = get(a), n = get(n))
-    }
+      }
+    
     df_Q$q_cfs <- round(df_Q$q_cfs, digits = 2)
     # Remove NULL values from BRC and ARC lists
     BRC_Flags[sapply(BRC_Flags, is.null)] <- NULL
@@ -170,83 +181,84 @@ df_HOBO <- HOBOcalc %>%
          Reportable = NA,
          ResultReported = as.character(df_Q$q_cfs)
          )
-}
-
-if(nrow(USGScalc) > 0){
-count <- count + 2
-# Create a working df
-qusgs <- select(USGScalc, c("Location","SampleDateTime","UniqueID")) %>%
-  mutate(Discharge = 0)
-
-# Filter each location, and for each record, run the data retrieval query
-
-locs <- c("MD04", "MD69", "MD07")
-pCodes <- "00060" # 60 is discharge
-
-for (j in seq_along(qusgs$SampleDateTime)) {
-
-  # Assign siteNo based Location, then assign the start date of data
-  if (grepl("MD04",qusgs$Location[j])) {
-    siteNo <- "01095434"   #GATES BROOK WEST BOYLSTON, MA
-    start <- as.POSIXct("2011-12-14")
-  } else {
-    if (grepl("MD69",qusgs$Location[j])) {
-      siteNo <- "01095375"   # 01095375	 QUINAPOXET RIVER AT CANADA MILLS NEAR HOLDEN, MA
-      start <- as.POSIXct("1996-11-21")
-    } else {
-      siteNo <- "01095220"   # 01095220	 STILLWATER RIVER NEAR STERLING, MA
-      start <- as.POSIXct("1994-04-21")
     }
-  } # End if
-
-  # Define the date of the stage timestamp to lookup (Can't use the listed stage value because of possible shifts)
-  flowdate <- as.character(date(qusgs$SampleDateTime[j]))
-
-  # Test if the flowdate is less than the start date
-  if(date(qusgs$SampleDateTime[j]) < start){
-    # There can be no discharge, move to the next one
-    next
-  } else { # Run the query get the flows
-    hg <- readNWISuv(siteNumbers = siteNo,
-                     parameterCd = pCodes,
-                     startDate = flowdate,
-                     endDate = flowdate,
-                     tz="America/New_York") %>%
-      renameNWISColumns() # Convenience function to rename columns
-  }
-
-  # Test if the query returned any results, if so, move on, if not, move to the next one
-  if(length(hg$dateTime) < 1) {
-    qusgs$Discharge[j] <- NA
-    print(paste(qusgs$Location[j],qusgs$SampleDateTime[j]," -No discharge data available for period selected"))
-    next #There was no discharge data available for this day
-  } else { # There is discharge data available - lookup dischage associated with the time of the sample
-    time <-  qusgs$SampleDateTime[j]
-    if (siteNo == "01095434"){
-      flow <- hg$Flow_Inst[hg$dateTime == round_date(time, "10 mins")]
-    } else {
-      flow <- hg$Flow_Inst[hg$dateTime == round_date(time, "15 mins")]
-    }
-    if(length(flow)>0){
-      qusgs$Discharge[j] <- flow
-    } else {
-      print(paste(qusgs$Location[j],qusgs$SampleDateTime[j],"There is no matching flow for the specified time"))
-      next
-    }
-  }
-} #End Loop
-qusgs$Discharge <- as.numeric(qusgs$Discharge)
-
-df_USGS <- USGScalc %>%
-  mutate(Analysis = "NWIS LOOKUP",
-         ReportedName = NA,
-         Parameter = "Discharge",
-         Units = "cfs",
-         Status = NA,
-         Reportable = NA,
-         ResultReported = as.character(qusgs$Discharge)
-  )
-} # End USGS Calcs
+} ### End HOBO discharge Calculations
+### Calculate USGS discharges --- Does not apply to Quabbin
+# if(nrow(USGScalc) > 0){
+# count <- count + 2
+# # Create a working df
+# qusgs <- select(USGScalc, c(4,27,28)) %>%
+#   mutate(Discharge = 0)
+# 
+# # Filter each location, and for each record, run the data retrieval query
+# 
+# locs <- c("MD04", "MD69", "MD07")
+# pCodes <- "00060" # 60 is discharge
+# 
+# for (j in seq_along(qusgs$SampleDateTime)) {
+# 
+#   # Assign siteNo based Location, then assign the start date of data
+#   if (grepl("MD04",qusgs$Location[j])) {
+#     siteNo <- "01095434"   #GATES BROOK WEST BOYLSTON, MA
+#     start <- as.POSIXct("2011-12-14")
+#   } else {
+#     if (grepl("MD69",qusgs$Location[j])) {
+#       siteNo <- "01095375"   # 01095375	 QUINAPOXET RIVER AT CANADA MILLS NEAR HOLDEN, MA
+#       start <- as.POSIXct("1996-11-21")
+#     } else {
+#       siteNo <- "01095220"   # 01095220	 STILLWATER RIVER NEAR STERLING, MA
+#       start <- as.POSIXct("1994-04-21")
+#     }
+#   } # End if
+# 
+#   # Define the date of the stage timestamp to lookup (Can't use the listed stage value because of possible shifts)
+#   flowdate <- as.character(date(qusgs$SampleDateTime[j]))
+# 
+#   # Test if the flowdate is less than the start date
+#   if(date(qusgs$SampleDateTime[j]) < start){
+#     # There can be no discharge, move to the next one
+#     next
+#   } else { # Run the query to match the
+#     hg <- readNWISuv(siteNumbers = siteNo,
+#                      parameterCd = pCodes,
+#                      startDate = flowdate,
+#                      endDate = flowdate,
+#                      tz="America/New_York") %>%
+#       renameNWISColumns() # Convenience function to rename columns
+#   }
+# 
+#   # Test it the query returned any results, if so, move on, if not, move to the next one
+#   if(length(hg$dateTime) < 1) {
+#     qusgs$Discharge[j] <- NA
+#     print(paste(qusgs$Location[j],qusgs$SampleDateTime[j]," -No discharge data available for period selected"))
+#     next #There was no discharge data available for this day
+#   } else { # There is discharge data available - lookup dischage associated with the time of the sample
+#     time <-  qusgs$SampleDateTime[j]
+#     if (siteNo == "01095434"){
+#       flow <- hg$Flow_Inst[hg$dateTime == round_date(time, "10 mins")]
+#     } else {
+#       flow <- hg$Flow_Inst[hg$dateTime == round_date(time, "15 mins")]
+#     }
+#     if(length(flow)>0){
+#       qusgs$Discharge[j] <- flow
+#     } else {
+#       print(paste(qusgs$Location[j],qusgs$SampleDateTime[j],"There is no matching flow for the specified time"))
+#       next
+#     }
+#   }
+# } #End Loop
+# qusgs$Discharge <- as.numeric(qusgs$Discharge)
+# 
+# df_USGS <- USGScalc %>%
+#   mutate(Analysis = "NWIS LOOKUP",
+#          ReportedName = NA,
+#          Parameter = "Discharge",
+#          Units = "cfs",
+#          Status = NA,
+#          Reportable = NA,
+#          ResultReported = as.character(qusgs$Discharge)
+#   )
+# } # End USGS Calcs
 
 # Combine HOBO and USGS Discharges depending on count value:
 # 0 -- There are no discharges - this should not happen since this script is triggered only when there are possible discharges to calculate
@@ -254,17 +266,17 @@ df_USGS <- USGScalc %>%
 # 2 -- There are USGS discharges, but no HOBO
 # 3 -- THere are both USGS and HOBO Discharges 
 
-if(count == 3){
-  df_Q <- bind_rows(df_HOBO, df_USGS)
-  } else {
-    if(count == 1){
-      df_Q <- df_HOBO
-    } else {
-      df_Q <- df_USGS
-    }
-}
+# if(count == 3){
+#   df_Q <- bind_rows(df_HOBO, df_USGS)
+#   } else {
+#     if(count == 1){
+#       df_Q <- df_HOBO
+#     } else {
+#       df_Q <- df_USGS
+#     }
+# }
 
-Q_dfs <- list(df_Q = df_Q,
+Q_dfs <- list(df_Q = df_HOBO,
               df_QFlags = df_QFlags)
 return(Q_dfs)
 } # End function

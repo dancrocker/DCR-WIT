@@ -121,11 +121,22 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     
   #Specify database connection
   con <- dbConnect(odbc::odbc(),
-                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                               paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                    timezone = "America/New_York")
-  df_param <- dbReadTable(con,"tblParameters")
   
+  # Get Parameters table  
+  if (try(file.access(config[1], mode = 4)) == 0) {
+    df_param <- dbReadTable(con,"tblParameters")
+  } else {
+    ### Get df Paramaeters from Dropbox rds files
+    df_wach_params_url <- config[31]
+    datadir <- paste0(getwd(), "/rds_files")
+    dir.create(file.path(datadir), showWarnings = FALSE)
+    GET(df_wach_params_url,
+        write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
+    df_param <- read_rds(paste0(datadir, "/df_wach_param.rds"))
+  }
 
   # UniqueID
   df.wq$UniqueID <- "" # I think this line is unnecessary too, but can leave it in just to be sure

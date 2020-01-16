@@ -27,7 +27,7 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
 
    # Connect to db for queries below
   con <- dbConnect(odbc::odbc(),
-                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                   .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                   paste0("DBQ=", flag.db), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
   flag <- as.numeric(flag)
@@ -52,8 +52,9 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
                                SampleID = flagRecords,
                                FlagCode = flag,
                                DateFlagged = today(),
-                               ImportStaff = username
+                               ImportStaff = as.character(username)
                             )
+# df.manualflags$ImportStaff <- as.character(df.manualflags$ImportStaff)
  # Disconnect from db and remove connection obj
  dbDisconnect(con)
  rm(con)
@@ -61,7 +62,7 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
  return(df.manualflags)
 
 }
-# PROCESS_DATA(flag.db, datatable, flagtable, flag, flagRecords)
+# df.manualflags <- PROCESS_DATA(flag.db, datatable, flagtable, flag, flagRecords)
 
 IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags){
 

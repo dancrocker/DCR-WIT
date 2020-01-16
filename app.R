@@ -1,40 +1,55 @@
-##############################################################################################################################
-#     Title: app.R
-#     Type: Master file DCR Import Data Shiny App
-#     Description: This Shiny App contains the "master" script for the Import Data app. The app contains a ui and server component
+################################### HEADER ###################################
+#  TITLE: app.R
+#  TYPE: Shiny App
+#  DESCRIPTION: This Shiny App contains the "master" script for the Import Data app. The app contains a ui and server component
 #           and sources R scripts from the App folder
-#     Written by: Nick Zinck, Dan Crocker
-      # Last Update: May, 2018
-##############################################################################################################################
+#  AUTHOR(S): Dan Crocker, Nick Zinck, Travis Drury
+#  DATE LAST UPDATED: December 2019
+#  GIT REPO: DCR-WIT
+#  R version 3.5.3 (2019-03-11)  i386
+##############################################################################.
+
 # Notes:
 #   1. If running locally the config file must be loaded first (see WAVE_WIT_Local script)
 
 #options(shiny.reactlog = TRUE) # This is a visual representation of reactivity
 
-####################################################################################################
-# Load Libraries and Script (Sources, Modules, and Functions)
-#####################################################################################################
+########################################################################.
+###    Load Libraries and Script (Sources, Modules, and Functions)  ####
+########################################################################.
+
 print(paste0("WIT App lauched at ", Sys.time()))
+
 ### Load packages
 
 ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages()[, "Package"])]
+  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[15])[, "Package"])]
   if (length(new.pkg))
-    install.packages(new.pkg, dependencies = TRUE, repos="http://cran.rstudio.com/")
+    install.packages(new.pkg, lib = config[15], dependencies = TRUE, repos="http://cran.rstudio.com/")
   sapply(pkg, require, character.only = TRUE)
 }
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
-              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr",
-              "sendmailR", "data.table", "dataRetrieval")
+
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
+              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr")
+
+# install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
+# Envoke package update every so often to update packages
+# update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
+
 # Load-Install Packages
 ipak(packages)
 
+library(RDCOMClient)
 # Connect to db for queries below
 con2 <- dbConnect(odbc::odbc(),
-                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb, *.accdb)}",
+                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                              paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"),
                   timezone = "America/New_York")
-#Set user info
+
+source("src/Functions/outlook_email.R", local = T)
+
+# Set user info
 user <-  Sys.getenv("USERNAME")
 userdata <- readxl::read_xlsx(path = config[17])
 username <- paste(userdata$FirstName[userdata$Username %in% user],userdata$LastName[userdata$Username %in% user],sep = " ")
@@ -46,8 +61,7 @@ MS <- config[5]
 
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
-  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) %>%
-  filter(ImportMethod == "Importer-R")
+  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
 } else {
   if (userlocation == "Quabbin") {
     datasets <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
@@ -60,18 +74,34 @@ if (userlocation == "Wachusett") {
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-flags <- dbReadTable(con2, "tblFlags") %>%
-  select(-3)
-flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
+if (try(file.access(config[1], mode = 4)) == 0) {
+  flags <- dbReadTable(con2, "tblFlags") %>%
+    select(-3)
+  flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
+} else {
+  ### Get df Flags from Dropbox rds files
+  df_flags_url <- config[30]
+  datadir <- paste0(getwd(), "/rds_files")
+  dir.create(file.path(datadir), showWarnings = FALSE)
+  GET(df_flags_url, 
+      write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
+  flags <- read_rds(paste0(datadir, "/df_flags.rds"))
+}
+
+### Get df Paramaeters from Dropbox rds files
+# df_wach_params_url <- config[31]
+# 
+# GET(df_wach_params_url, 
+#     write_disk(paste0(datadir, "/df_wach_param.rds"), overwrite = T))
 
 # Disconnect and remove connection
 dbDisconnect(con2)
 rm(con2)
 actionCount <- reactiveVal(0)
 
-###################################################################################
-##################################  User Interface  ###############################
-###################################################################################
+########################################################################.
+###                      User Interface                             ####
+########################################################################.
 
 ui <- tagList(
       useShinyjs(),
@@ -89,13 +119,12 @@ ui <- tagList(
                     h2("Import Data To Databases", align = "center"),
                     br()
                   )
-#############################################################
                 ),  # End Fluid Row
                 fluidRow(
                   column(6,
                          wellPanel(
                            selectInput("datatype", h4("1. Select data type:"),
-                                       choices = datasets$DataType),
+                                       choices = datasets$DataType[datasets$ImportMethod == "Importer-R"]),
                            br()
                          )
                   ),
@@ -251,18 +280,19 @@ ui <- tagList(
   ) # Close Div
 ) # End tagList
 
-########################################################################################
-################################    SERVER   ###########################################
-########################################################################################
+########################################################################.
+###                          SERVER                                 ####
+########################################################################.
 
 server <- function(input, output, session) {
 
-  ##################################################################################
-  #############               IMPORT DATA TAB             ##########################
-  ##################################################################################
+########################################################################.
+###                      IMPORT DATA TAB                            ####
+########################################################################. 
 
 ### Generate function agruments from UI selections
 
+### Reactive dfs ####
   ds <- reactive({
     filter(datasets, DataType == input$datatype)
   })
@@ -293,11 +323,10 @@ server <- function(input, output, session) {
   })
   distro1 <- reactive({
     req(ds())
-    as.character(ds()$EmailList[1]) %>%
-      strsplit(", ")
+    as.character(ds()$EmailList[1])
   })
 
-  ### FILE SELECTION
+### FILE SELECTION ####
 
   # Make the File List
   files <- eventReactive(rawdatafolder() ,{
@@ -308,6 +337,7 @@ server <- function(input, output, session) {
          perl =T)
   })
 
+### File UI ####  
   # Select Input where user finds and sets the file to import (# this could be set up to do multiple files at a time, but its safer to just do one at a time)
   output$file.UI <- renderUI({
     req(files())
@@ -316,7 +346,7 @@ server <- function(input, output, session) {
                 choices = files())
   })
 
-  # Update Select Input when a file is imported (actually when the import button is pressed (successful or not))
+# Update Select Input when a file is imported (actually when the import button is pressed (successful or not))
   observeEvent(input$import, {
     updateSelectInput(session = session,
                       inputId = "file",
@@ -325,6 +355,7 @@ server <- function(input, output, session) {
                       selected = input$file)
   })
 
+### Probe UI ####
   # Show Probe Option when Profile Data Selected
   output$probe.UI <- renderUI({
     req(input$datatype == "Profiles")
@@ -338,9 +369,9 @@ server <- function(input, output, session) {
                 selected = "YSI_EXO2")
   })
 
-  ### Process DATA
+### Process DATA ####
 
-  # Process Action Button
+### Process UI ####
   output$process.UI <- renderUI({
     req(input$file)
     actionButton(inputId = "process",
@@ -348,14 +379,21 @@ server <- function(input, output, session) {
                  width = '500px')
   })
 
+### Process Button ####
+  
   # Run the function to process the data and return 2 dataframes and path as list
   dfs <- eventReactive(input$process,{
+    showModal(busyModal(msg = "Processing data..."))
     source(scriptname(), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    PROCESS_DATA(file = input$file, rawdatafolder = rawdatafolder(), filename.db = filename.db(),
+    dfs <- PROCESS_DATA(file = input$file, rawdatafolder = rawdatafolder(), filename.db = filename.db(),
                  probe = input$probe, ImportTable = ImportTable(), ImportFlagTable = ImportFlagTable())
-  })
+       
+    # hide("loading-content") # make the loading pane disappear
+    return(dfs)
+    })
+  
 
-  # Extract each dataframe
+### Extract each dataframe
   df.wq <- reactive({
             dfs()[[1]]
         })
@@ -365,26 +403,82 @@ server <- function(input, output, session) {
   df.flags  <- reactive({
             dfs()[[3]]
         })
+  
+  unmatchedtimes  <- reactive({
+    req(ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
+         dfs()[[4]]
+        })
+  
+  ### Import Email Message ####
+  qcpath <- reactive({
+    paste0("file:///", str_replace_all(config[28],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
+  })
+  reactive_emailmsg <- reactiveVal(
+    ""
+  )
+  reactive_emailsubject <- reactiveVal(
+    ""
+  )  
+  observeEvent(input$import, {
+    if(file.exists(paste0(config[28],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+      reactive_emailmsg(
+        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p>
+               <p>Warning: Quality control outliers found in imported data. See QC Log <a href=",qcpath(),">",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
+        )
+      reactive_emailsubject(
+        paste0("New Data has been Imported to a ", userlocation," Database with QC Warning")
+      )
+    } else {
+      reactive_emailmsg(
+        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p></body>")
+      )
+      reactive_emailsubject(
+        paste0("New Data has been Imported to a ", userlocation," Database")
+      )
+    }
+  }, ignoreInit = TRUE)
+    
 
-  # Last File to be Processed
+  ### Last File to be Processed
   file.processed <- eventReactive(input$process, {
     input$file
   })
 
-  # Text for Process Data Error or Successful
+### Text for Process Data Error or Successful
   process.status <- reactive({
     if(input$file != file.processed()){
       " "
     }else if(inherits(try(df.wq()), "try-error")){
+      removeModal()
       geterrmessage()
     }else{
+      removeModal()
+      # Create modal dialog box if location and date/time do not match any records in database. Could mean incorrect times on MWRA data.  
+      if (ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)") { ### only do this for trib MWRA data
+        if (nrow(unmatchedtimes()) > 0) {
+        displaytable <- reactive({
+          unmatchedtimes()[c("ID","UniqueID")]
+        })
+        showModal(modalDialog(
+          title = "Warning: Sample(s) with unmatched times processed.",
+          HTML("<h4>Data processing was successful.<br/><br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>IDs and UniqeIDs for the samples with unmatched times are presented below and have also been printed to the WIT log.</h4><br/>"),
+          renderDataTable(displaytable())
+        ))
+        }
+      }
       paste0('The file "', input$file, '" was successfully processed')
+      
     }
   })
 
-  # Text Output
-  output$text.process.status <- renderText({process.status()})
 
+  # Text Output
+  output$text.process.status <- renderText({
+    process.status()
+    })
+  
+
+  
   # Show import button and tables when process button is pressed
   # Use of req() later will limit these to only show when process did not create an error)
   observeEvent(input$process, {
@@ -392,8 +486,21 @@ server <- function(input, output, session) {
     # show('table.process.wq')
     # show('table.process.flag')
   })
+  
 
-  ### Import Data
+  busyModal <- function(msg){
+    modalDialog(
+      size = "s",
+      fluidPage(
+        useShinyjs(),
+        includeCSS("www/animate.min.css"),
+        includeCSS("www/animate.css"),
+        h2(class = "animated infinite pulse", msg)
+        )
+    )
+  }
+  
+### Import UI ####
 
   # Import Action Button - Will only be shown when a file is processed successfully
   output$import.UI <- renderUI({
@@ -402,9 +509,11 @@ server <- function(input, output, session) {
                  label = paste("Import", file.processed(), "Data"),
                  width = '500px')
   })
-
+  
+  ### Import Button ####  
   # Import Data - Run import_data function
   observeEvent(input$import, {
+    showModal(busyModal(msg = "Importing data ..."))
     source(scriptname(), local = T)
     out <- tryCatch(IMPORT_DATA(df.wq = df.wq(),
                                 df.flags = df.flags(),
@@ -413,44 +522,74 @@ server <- function(input, output, session) {
                                 filename.db = filename.db(),
                                 processedfolder = processedfolder(),
                                 ImportTable = ImportTable(),
-                                ImportFlagTable = ImportFlagTable()),
-                    error = function(e) e)
+                                ImportFlagTable = ImportFlagTable())
+                    ,
+                    error=function(cond) {
+                      msg <<- paste("Import Failed - There was an error at ", Sys.time() ,
+                                    "...\n ", cond)
+                      # print(msg)
+                      return(1)
+                    },
+                    warning=function(cond) {
+                      msg <<- paste("Import process completed with warnings...\n", cond)
+                      print(msg)
+                      return(2)
+                    },
+                    finally={
+                      message(paste("Import Process Complete ..."))
+                    }
+    )
 
-          ImportFailed <- any(class(out) == "error")
+          # ImportFailed <- is.na(out)
 
-          if (ImportFailed == TRUE){
-            print(paste0("Import Failed at ", Sys.time() ,". There was an error: "))
-            print(out)
+          if (out == 1){
+            removeModal()
+            print(msg)
+            import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
           } else {
             print(paste0("Data Import Successful at ", Sys.time()))
+            import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
+                                  input$datatype, " | Filename = ", input$file)
             NewCount <- actionCount() + 1
             actionCount(NewCount)
             print(paste0("Action Count was ", actionCount()))
             ImportEmail()
           }
+          removeModal()
+          if (length(which(df.wq()$Location =="MISC"))>0) {
+            showModal(modalDialog(
+              title = "Warning: MISC Sample(s) Imported",
+              HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
+            ))
+          }
   })
 
-  # Function to send ImportEmail
   ImportEmail <- function() {
-    out <- tryCatch({
-      message("Trying to send email")
-      sendmail(from = paste0("<",useremail,">"),
-               to = distro1(),
-               subject = paste0("New Data has been Imported to a ", userlocation," Database"),
-               msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
-                            input$datatype, " | Filename = ", input$file),
-               control=list(smtpServer=MS))
-      },
+    out <- tryCatch(
+      message("Trying to send email"),
+      OL_EMAIL(to = distro1(), 
+               subject = reactive_emailsubject(),
+               body = reactive_emailmsg()
+      ),
+      
+    ### SMTP METHOD (ONLY WORKS WHEN McAfee GROUP POLICY ALLOWS)  
+      # sendmail(from = paste0("<",useremail,">"),
+      #          to = distro1(),
+      #          subject = paste0("New Data has been Imported to a ", userlocation," Database"),
+      #          msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
+      #                       input$datatype, " | Filename = ", input$file),
+      #          control=list(smtpServer=MS))
+    
       error=function(cond) {
-        message(paste("User cannot connect to SMTP Server, cannot send email"))
-        return(NA)
+        message(paste("User cannot connect to SMTP Server, cannot send email", cond))
+        return(1)
       },
       warning=function(cond) {
-        message(paste("Send mail function caused a warning, but was completed successfully"))
-        return(NULL)
+        message(paste("Send mail function caused a warning, but was completed successfully", cond))
+        return(2)
       },
       finally={
-        message(paste("Import Process Complete"))
+        message(paste("Email notification attempted"))
       }
     )
     return(out)
@@ -459,8 +598,6 @@ server <- function(input, output, session) {
   # Hide import button and tables when import button is pressed (So one cannot double import same file)
   observeEvent(input$import, {
     hide('import')
-    #hide('table.process.wq')
-    #hide('table.process.flag')
   })
 
   # Create a delayed reactive to trigger input file change update after import
@@ -476,16 +613,17 @@ server <- function(input, output, session) {
     insertUI(
       selector = "#import",
       where = "afterEnd",
-      ui = h4(paste("Successful import of", nrow(df.wq()), "record(s) in", input$file, "to", input$datatype, "Database"))
+      ui = h4(paste(import_msg))
     )
   })
 
   ### Table Outputs
 
   # Processed WQ Table - Only make table if processing is successful
+  
   output$table.process.wq <- renderDataTable({
     req(try(df.wq()))
-    df.wq()
+   df.wq()
   })
 
   # Processed Flag Table - Only make table if processing is successful
@@ -494,26 +632,25 @@ server <- function(input, output, session) {
     df.flags()
   })
 
+########################################################################.
+###                          MANUAL FLAG TAB                        ####
+########################################################################.
 
-  ##################################################################################
-  #############               MANUAL FLAG TAB             ##########################
-  ##################################################################################
-
-  ### Generate function agruments from UI selections
-
+### Generate function agruments from UI selections
+### Reactive dfs ####
   dsflags <- reactive({
     filter(flagdatasets, DataType == input$flagdatatype)
   })
   flag.db <- reactive({
-    req(dsflags())
+    # req(dsflags())
     dsflags()$DBPath[1]
   })
-  datatable <- reactive({
-    req(dsflags())
+  datatable2 <- reactive({
+    # req(dsflags())
     dsflags()$TableName[1]
   })
   flagtable <- reactive({
-    req(dsflags())
+    # req(dsflags())
     dsflags()$FlagTable[1]
   })
   flagSelected <- reactive({
@@ -522,13 +659,12 @@ server <- function(input, output, session) {
     })
 
   distro2 <- reactive({
-    req(dsflags())
-    as.character(dsflags()$EmailList[1]) %>%
-      strsplit(", ")
+    # req(dsflags())
+    as.character(dsflags()$EmailList[1])
   })
 
   flagsA <- reactive({
-    req(isTruthy(input$flagsA))
+    # req(isTruthy(input$flagsA))
     if(isTruthy(input$flagsA)){
       x <- str_split(input$flagsA,",") %>%
         lapply(function(x) as.numeric(x))
@@ -581,15 +717,14 @@ server <- function(input, output, session) {
     paste0(length(flagsC()), " records have been marked for flagging: ", list(flagsC()))
   })
 
-  output$D <-
-    renderText({
+  output$D <- renderText({
       req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
       paste0(length(flagRecords()), " records have been marked for flagging: ", list(flagRecords()))
     })
 
-  ### Process DATA
+  ### PROCESS FLAGS ####
 
-  # Process Manual Flags Button
+  ### PROCESS MANUAL FLAGS UI ####
   output$processflags.UI <- renderUI({
     req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
     actionButton(inputId = "processflags",
@@ -597,18 +732,22 @@ server <- function(input, output, session) {
                  width = '500px')
   })
 
-   # # Run the function to process
+   ### PROCESS FLAGS BUTTON ####
   df.manualflags <- eventReactive(input$processflags, {
+    showModal(busyModal(msg = "Processing flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    PROCESS_DATA(flag.db = flag.db() , datatable = datatable(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
-  })
-
+    df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
+    removeModal()
+    return(df.manualflags)
+     })
+  ### PROCESSED FLAGS TABLE ####
   # Processed Flag Table - Only make table if processing is successful
   output$table.manual.flag <- renderDataTable({
     req(try(df.manualflags()))
     df.manualflags()
   })
 
+  ### IMPORT FLAGS UI ####
   # Import Action Button - Will only be shown when a file is processed successfully
   output$importFlags.UI <- renderUI({
     req(try(df.manualflags()))
@@ -617,8 +756,10 @@ server <- function(input, output, session) {
                  width = '500px')
   })
 
+### IMPORT FLAGS BUTTON ####  
   # Import Data - Run import_data function
   observeEvent(input$importFlags, {
+    showModal(busyModal(msg = "Importing flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
@@ -626,10 +767,10 @@ server <- function(input, output, session) {
                         error = function(e) e)
 
     ImportFailed <- any(class(out) == "error")
-
+    
     if (ImportFailed == TRUE){
-      print(paste0("Flag Import Failed at ", Sys.time(), ". There was an error: "))
-      print(out)
+      print(paste0("Flag Import Failed at ", Sys.time(), ". There was an error... see log file to troubleshoot."))
+      # print(out)
     } else {
       print(paste0("Flag Import Successful at ", Sys.time()))
       NewCount <- actionCount() + 1
@@ -637,26 +778,32 @@ server <- function(input, output, session) {
       print(actionCount())
       FlagEmail()
     }
+    removeModal()
   })
 
 # Function to send FlagEmail
   FlagEmail <- function() {
       out <- tryCatch({
           message("Trying to send email")
-          sendmail(from = paste0("<",useremail,">"),
-                   to = distro2(),
-                   subject = paste0("Data has been flagged in a ", userlocation," Database"),
-                   msg = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
-                                input$flagdatatype, ", with flag ", input$flag),
-                   control=list(smtpServer=MS))
+          OL_EMAIL(to = distro2(), 
+                 subject = paste0("Data has been flagged in a ", userlocation," Database"),
+                 body = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
+                               input$flagdatatype, ", with flag ", input$flag)
+          )
+          # sendmail(from = paste0("<",useremail,">"),
+          #          to = distro2(),
+          #          subject = paste0("Data has been flagged in a ", userlocation," Database"),
+          #          msg = paste0(username," has flagged ", length(flagRecords()), " existing record(s) for the dataset: ",
+          #                       input$flagdatatype, ", with flag ", input$flag),
+          #          control=list(smtpServer=MS))
         },
         error=function(cond) {
-          message(paste("User cannot connect to SMTP Server, cannot send email"))
-          return(NA)
+          err <- print("User cannot connect to SMTP Server, cannot send email")
+          return(err)
         },
         warning=function(cond) {
-          message(paste("Send mail function caused a warning, but was completed successfully"))
-          return(NULL)
+          warn <- print("Send mail function caused a warning, but was completed successfully")
+          return(warn)
         },
         finally={
           message("Import Process Complete")
@@ -665,7 +812,7 @@ server <- function(input, output, session) {
       return(out)
     }
 
-  # Add text everytime successful import
+  ### IMPORT MESSAGE ####
   observeEvent(input$importFlags, {
     insertUI(
       selector = "#importFlags",
@@ -691,6 +838,8 @@ server <- function(input, output, session) {
   #   }
   # })
 
+### REFRESH BUTTONS ####
+  
   observeEvent(input$refresh, {
     shinyjs::reset("form")
   })
@@ -699,16 +848,14 @@ server <- function(input, output, session) {
     shinyjs::reset("form")
   })
 
-  ######################################################
+### END SESSION ACTIONS ####
   # Stop app when browser session window closes
   session$onSessionEnded(function() {
           # If data was successfully imported/flagged, then actionCount should be > 0; Update data files for WAVE App
 
     if (isolate(actionCount()) > 0) {
-            if (Sys.getenv("USERNAME") != "bkeevan") {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
               shell.exec(config[11])
-            }
           } else {
             print("Action Count was 0, data not modified in databases; New .rds files will not be generated")
           }
@@ -719,5 +866,4 @@ server <- function(input, output, session) {
 } # end server function
 
 #combines the user interface and server (it's a must)
-shinyApp(ui = ui, server = server)
-
+shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE, port = 8887))
