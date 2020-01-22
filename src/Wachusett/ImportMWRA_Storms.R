@@ -1,17 +1,18 @@
-###############################  HEADER  ######################################
-#  TITLE: ImportMWRA.R
-#  DESCRIPTION: This script will Format/Process MWRA data to DCR
-#               This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
+################################  HEADER  ####################################
+#  TITLE: ImportMWRA_Storms.R
+#  DESCRIPTION: This script will Format/Process MWRA Storm Sample data to WQ Database
 #  AUTHOR(S): Dan Crocker
-#  DATE LAST UPDATED: 2020-01-21
+#  DATE LAST UPDATED: 2020-01-17
 #  GIT REPO: WIT
 #  R version 3.5.3 (2019-03-11)  i386
 ##############################################################################.
 
+# This script will process and import MWRA Projects: WATMDC and WATBMP
+
 # NOTE - THIS SECTION IS FOR TESTING THE FUNCTION OUTSIDE SHINY
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
-# # Load libraries needed ####
+### Load libraries needed ####
 
     # library(tidyverse)
     # library(stringr)
@@ -29,12 +30,10 @@
     # library(lubridate)
     # library(magrittr)
     # library(readxl)
-    # library(testthat)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
-
 ########################################################################.
-###                         PROCESSING FUNCTION                     ####
+###                       PROCESSING FUNCTION                       ####                               
 ########################################################################.
 
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
@@ -44,55 +43,52 @@ options(scipen = 999) # Eliminate Scientific notation in numerical fields
 path <- paste0(rawdatafolder,"/", file)
 
 # Read in the data to a dataframe
-df.wq <- read_excel(path, sheet = 1, col_names = T, trim_ws = T, na = "nil") %>%
+df.wq <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
   as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
-df.wq <- df.wq[,c(1:25)]
+df.wq <- df.wq[,c(1:26)]
 
 ########################################################################.
-###                        Perform Data checks                      ####
+###                       Perform Data checks                       ####
 ########################################################################.
 
 # At this point there could be a number of checks to make sure data is valid
-
-  # Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
-  if (nrow(df.wq) != length(paste0(df.wq$SampleDate, df.wq$Location,df.wq$Parameter) %>% unique())) {
-    # Send warning message to UI that it appears that there are storm samples in the data
-    stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
-         \nCheck the file before proceeding and split storm samples into separate file to import")
-  }
   # Check to make sure there are 25 variables (columns)
-  if (ncol(df.wq) != 25) {
+  if (ncol(df.wq) != 26) {
     # Send warning message to UI if TRUE
-    stop("There are not 25 columns of data in this file.\n Check the file before proceeding")
+    stop("There are not 26 columns of data in this file. \nMake sure the 'StormSampleN' column was added and filled in.")
   }
   # Check to make sure column 1 is "Original Sample" or other?
-  if (any(colnames(df.wq)[1] != "Original Sample" & df.wq[25] != "X Ldl")) {
+  if (any(colnames(df.wq)[1] != "Original Sample" & df.wq[25] != "X Ldl" & df.wq[26] != "StormSampleN")) {
     # Send warning message to UI if TRUE
     stop("At least 1 column heading is unexpected.\n Check the file before proceeding")
   }
   # Check to see if there were any miscellaneous locations that did not get assigned a location
-  if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"),TRUE)) > 0) {
+  if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"), TRUE)) > 0) {
   #Send warning message to UI if TRUE
     warning("There are unspecified (MISC) - please review before importing data!")
   }
   # Check to see if there were any GENERAL locations that did not get assigned a location
-  if (length(which(str_detect(df.wq$Name, "GENERAL-GEN"),TRUE)) > 0) {
+  if (length(which(str_detect(df.wq$Name, "GENERAL-GEN"), TRUE)) > 0) {
     # Send warning message to UI if TRUE
     stop("There are unspecified (GEN) locations that need to be corrected before importing data")
   }
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
-# Connect to db for queries below
+### Connect to db for queries below ####
 con <- dbConnect(odbc::odbc(),
                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
                  timezone = "America/New_York")
 
+params <- dbReadTable(con,"tblParameters")
+dbDisconnect(con)
+rm(con)
+
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
 ########################################################################.
 
-### Rename Columns in Raw Data ####
+### Rename Columns in Raw Data
 names(df.wq) = c("SampleGroup",
                  "SampleNumber",
                  "TextID",
@@ -117,7 +113,8 @@ names(df.wq) = c("SampleGroup",
                  "EDEP_MW_Confirm",
                  "Reportable",
                  "Method",
-                 "DetectionLimit")
+                 "DetectionLimit",
+                 "StormSampleN")
 
 
 ### Date and Time ####
@@ -137,12 +134,13 @@ df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
-### Fix the Parameter names ####  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+### Fix the Parameter names - from MWRA name to ParameterName ####
+
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
-### Remove records with missing elements/uneeded data ####
-# Delete possible Sample Address rows (Associated with MISC Sample Locations):
+### Remove problematic Records ####
+
+### Delete possible Sample Address rows (Associated with MISC Sample Locations):
 df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
   filter(!is.na(Parameter),
          !is.na(ResultReported))
@@ -162,36 +160,183 @@ df.wq$Location %<>%
   gsub("QUABBINT-","", .) %>%
   gsub("QUABBIN-","", .)
 
+
+### DataSource ####
+df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
+
+# note: some reported results are "A" for (DEP). These will be NA in the ResultFinal Columns
+# ResultReported -
+# Find all valid results, change to numeric and round to 6 digits in order to eliminate scientific notation
+# Replace those results with the updated value converted back to character
+
+edits <- str_detect(df.wq$ResultReported, paste(c("<",">"), collapse = '|')) %>%
+  which(T)
+update <- as.numeric(df.wq$ResultReported[-edits], digits = 6)
+df.wq$ResultReported[-edits] <- as.character(update)
+
+### FinalResult (numeric) ####
+# Make the variable
+df.wq$FinalResult <- NA
+# Set the vector for mapply to operate on
+x <- df.wq$ResultReported
+# Function to determine FinalResult
+FR <- function(x) {
+  if(str_detect(x, "<")){# BDL
+    as.numeric(gsub("<","", x), digits =4) * 0.5 # THEN strip "<" from reported result, make numeric, divide by 2.
+  } else if (str_detect(x, ">")){
+    as.numeric(gsub(">","", x)) # THEN strip ">" form reported result, make numeric.
+  } else {
+    as.numeric(x)
+  }# ELSE THEN just use Result Reported for Result and make numeric
+}
+df.wq$FinalResult <- mapply(FR,x) %>%
+  round(digits = 4)
+
 ########################################################################.
-###                           Add new Columns                       ####
+###                Get Discharges From HOBO Data                    ####                  
 ########################################################################.
 
-### Unique ID number ####
-df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+# Connect to db for queries below
+con <- dbConnect(odbc::odbc(),
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
+                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
+                 timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
+
+locs <- df.wq$Location %>% unique()
+
+### Placeholder for fetching USGS Instantaneous Values from NWIS ####
+
+times <- df.wq$SampleDateTime %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
+
+### Pull hobo recs with matching timestamps
+qry_hobo_rec <- paste0("SELECT * FROM tbl_HOBO WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
+hobo_rec <- dbGetQuery(con, qry_hobo_rec)
+dbDisconnect(con)
+rm(con)
+
+if(any(!times %in% unique(hobo_rec$DateTimeUTC))) {
+  print(times[!which(times %in% hobo_rec$DateTimeUTC)] %>% with_tz("America/New_York"))
+  stop("Not all storm samples have associated field parameters records (including discharge)!")
+}
+
+### Match by Location and Time
+# Get Sample Loc-Times 
+LocTimes <- paste0(df.wq$Location,"-",df.wq$SampleDateTime)
+df.wq$LocTimes <- LocTimes
+### Convert hobo timestamps to local time
+hobo_rec$DateTimeUTC <- with_tz(hobo_rec$DateTimeUTC, "America/New_York") 
+
+hobo_rec <- rename(hobo_rec, "DateTimeET" = "DateTimeUTC")
+hobo_locTimes <- paste0(hobo_rec$Location,"-",hobo_rec$DateTimeET)              
+
+### Make sure all LocTimes match
+if(any(!LocTimes %in% hobo_locTimes)) {
+  print(LocTimes[which(LocTimes %in% hobo_locTimes)])
+  stop("Not all storm samples have associated HOBO records (including discharge)!")
+}
+### Filter out any extraneous HOBO data records
+hobo_rec <- hobo_rec[which(hobo_locTimes %in% LocTimes),]
+
+### Format HOBO records
+
+hobo_rec <- hobo_rec %>% 
+  select(c(2,3,6:7)) %>% # Temperature not selected since it comes in with field parameters also, would cause dups if included
+  rename("SampleDateTime" = "DateTimeET", 
+         "Staff Gauge Height" = "Stage_ft", 
+         "Discharge" = "Discharge_cfs") %>% 
+  gather(key = "Parameter", value = "FinalResult", 3:4) %>% 
+  mutate("Units" = params$ParameterUnits[match(.$Parameter, params$ParameterName)],
+         "LocTime" = paste0(.$Location, "-", .$SampleDateTime))
+### Add StormID
+hobo_rec <- hobo_rec %>% 
+  mutate("StormSampleN" = df.wq$StormSampleN[match(.$LocTime, df.wq$LocTimes)],
+         "DataSource" = "DWSP_HOBO_Data",
+         "ResultReported" = as.character(FinalResult)) %>% 
+  select(-LocTime)
 
 ########################################################################.
-###                         Calculate Discharges                    ####
+###                         Get Field Parameters                    ####
 ########################################################################.
 
-ratings <- dbReadTable(con, "tblRatings")
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$Current == TRUE], Parameter == "Staff Gauge Height")
-if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
-  # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
-  Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
-  # Extract the 2 dfs out of the list
-  df_Q <- Q_dfs$df_Q
-  df_QFlags <- Q_dfs$df_QFlags
-  df.wq <- bind_rows(df.wq,df_Q)
-  # Merge in Discharge Records
-} else {
-  print("No stage records available for discharge calculations")
+# Connect to db for queries below
+con <- dbConnect(odbc::odbc(),
+                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
+                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
+                 timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
+# Below 2 lines same as above (can be deleted)
+# locs <- df.wq$Location %>% unique()
+# times <- df.wq$SampleDateTime %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
+
+### Pull hobo recs with matching timestamps
+qry_fp_rec <- paste0("SELECT * FROM tblStormFieldParameters WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
+fp_rec <- dbGetQuery(con, qry_fp_rec)
+
+if(any(!times %in% unique(fp_rec$DateTimeUTC))) {
+  print(times[which(!times %in% fp_rec$DateTimeUTC)] %>% with_tz("America/New_York")) %>% sort()
+  stop("Not all storm samples have associated field parameters records!")
+}
+
+### Match by Location and Time
+# Get Sample Loc-Times 
+# LocTimes <- paste0(df.wq$Location,"-",df.wq$SampleDateTime)
+
+### Convert field parameter timestamps to local time
+fp_rec$DateTimeUTC <- with_tz(fp_rec$DateTimeUTC, "America/New_York") 
+
+fp_rec <- rename(fp_rec, "DateTimeET" = "DateTimeUTC")
+fp_locTimes <- paste0(fp_rec$Location,"-",fp_rec$DateTimeET)              
+
+### Make sure all LocTimes match
+if(any(!LocTimes %in% fp_locTimes)) {
+  print(LocTimes[which(LocTimes %in% fp_locTimes)])
+  stop("Not all storm samples have associated field parameters records (including discharge)!")
+}
+### Filter out any extraneous field parameter records
+fp_rec <- fp_rec[which(fp_locTimes %in% LocTimes),]
+
+### Format FP records
+
+fp_rec <- fp_rec %>% 
+  select(c(2:8)) %>% 
+  rename("SampleDateTime" = "DateTimeET", 
+         "Water Temperature" = "Water_temp_c", 
+          "Specific Conductance" = "Conductivity_uScm",
+          "Dissolved Oxygen" = "Dissolved_Oxygen_mgL") %>% 
+  gather(key = "Parameter", value = "FinalResult", 4:7) %>% 
+  mutate("Units" = params$ParameterUnits[match(.$Parameter, params$ParameterName)],
+         "DataSource" = "DWSP_YSI_Storm_Field_Data",
+         "ResultReported" = as.character(FinalResult)) %>% 
+  rename("StormSampleN" = StormID)
+
+########################################################################.
+###                  Combine HOBO and FP records with df.wq         ####
+########################################################################.
+
+df.wq <- df.wq %>% 
+  bind_rows(hobo_rec) %>% 
+  bind_rows(fp_rec)
+
+df.wq$LocTime <-  paste0(df.wq$Location,"-",df.wq$SampleDateTime)  
+
+### Update the storm sample numbers ####
+for (loc in unique(df.wq$Location)){
+  times <- df.wq$SampleDateTime[df.wq$Location == loc] %>% unique() %>% sort()
+  for (i in seq_along(times)) {
+    df.wq$StormSampleN[df.wq$Location == loc & df.wq$SampleDateTime == times[i]] <- paste0(df.wq$StormSampleN[df.wq$Location == loc & df.wq$SampleDateTime == times[i]], "-", i)
+  }
 }
 
 ########################################################################.
-###                           Check Duplicates                      ####
+###                         Add new Columns                         ####
 ########################################################################.
+
+### Unique ID number ####
+df.wq$UniqueID <- NA_character_
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+
+########################################################################.
+###                        Check for Duplicates                     ####
+########################################################################. 
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -217,49 +362,21 @@ if (nrow(dupes2) > 0){
 Eliminate all duplicates before proceeding.",
              "The duplicate records include:", paste(head(dupes2$UniqueID, 15), collapse = ", ")), call. = FALSE)
 }
+
 rm(Uniq)
 
-### DataSource ####
-df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
-
 ### DataSourceID ####
+
 # Do some sorting first:
 df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
 
-# note: some reported results are "A" for (DEP). These will be NA in the ResultFinal Columns
-# ResultReported -
-# Find all valid results, change to numeric and round to 6 digits in order to eliminate scientific notation
-# Replace those results with the updated value converted back to character
-
-edits <- str_detect(df.wq$ResultReported, paste(c("<",">"), collapse = '|')) %>%
-  which(T)
-update <- as.numeric(df.wq$ResultReported[-edits], digits = 6)
-df.wq$ResultReported[-edits] <- as.character(update)
-
-### FinalResult (numeric)
-# Make the variable
-df.wq$FinalResult <- NA
-# Set the vector for mapply to operate on
-x <- df.wq$ResultReported
-# Function to determine FinalResult
-FR <- function(x) {
-  if(str_detect(x, "<")){# BDL
-    as.numeric(gsub("<","", x), digits =4) * 0.5 # THEN strip "<" from reported result, make numeric, divide by 2.
-  } else if (str_detect(x, ">")){
-      as.numeric(gsub(">","", x)) # THEN strip ">" form reported result, make numeric.
-    } else {
-      as.numeric(x)
-    }# ELSE THEN just use Result Reported for Result and make numeric
-  }
-df.wq$FinalResult <- mapply(FR,x) %>%
-  round(digits = 4)
-
 ### Flag (numeric) ####
 # Use similar function as to assign flags
 df.wq$FlagCode <- NA
+x <- df.wq$ResultReported
 FLAG <- function(x) {
   if (str_detect(x, "<")) {
     100     # THEN set BDL (100 for all datasets except reservoir nutrients)
@@ -271,49 +388,15 @@ FLAG <- function(x) {
 }
 df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
-### Storm SampleN (numeric) ####
-df.wq$StormSampleN <- NA_character_
+### Storm SampleN (numeric) - brought in during bind_rows operation ####
 
-### Import date (Date) ####
+### Importdate (Date) ####
 df.wq$ImportDate <- Sys.Date()
 
-########################################################################.
-###                      REMOVE ANY PRELIMINARY DATA                ####
-########################################################################.
-
-# Calculate the date range of import ####
-datemin <- min(df.wq$SampleDateTime)
-datemax <- max(df.wq$SampleDateTime)
-
-# IDs to look for - all records in time peroid in question
-qry <- paste0("SELECT (ID) FROM ", ImportTable, " WHERE (SampleDateTime) >= #", datemin, "# AND (SampleDateTime) <= #", datemax,"#")
-query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
-
-if (nrow(query.prelim) > 0) {# If true there is at least one record in the time range of the data
-  # SQL query that finds matching sample ID from tblSampleFlagIndex Flagged 102 within date range in question
-  qryS <- paste0("SELECT SampleID FROM ", ImportFlagTable, " WHERE FlagCode = 102 AND SampleID IN (", paste0(query.prelim$ID, collapse = ","), ")")
-  qryDelete <- dbGetQuery(con,qryS) # Check the query to see if it returns any matches
-  # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
-  if(nrow(qryDelete) > 0) {
-    qryDeletePrelimData <- paste0("DELETE * FROM ", ImportTable," WHERE ID IN (", paste0(qryDelete$SampleID, collapse = ","), ")")
-    rs <- dbSendStatement(con,qryDeletePrelimData)
-    print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
-    dbClearResult(rs)
-
-# Next delete all flags associated with preliminary data - Will also delete any other flag associated with record number
-    qryDeletePrelimFlags <- paste0("DELETE * FROM ", ImportFlagTable, " WHERE SampleID IN (", paste0(qryDelete$SampleID, collapse = ","), ")")
-    rs <- dbSendStatement(con, qryDeletePrelimFlags)
-    print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
-    dbClearResult(rs)
-  }
-}
-
-########################################################################.
-###                               SET IDs                           ####
-########################################################################.
+### IDs ####
 
 # Read Tables
-# WQ ####
+# WQ
 setIDs <- function(){
 query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
 # Get current max ID
@@ -330,7 +413,9 @@ df.wq$ID <- seq.int(nrow(df.wq)) + ID.max.wq
 }
 df.wq$ID <- setIDs()
 
-### Flags ####
+########################################################################.
+###                           Flags                                 ####
+########################################################################.
 
 # First make sure there are flags in the dataset
 setFlagIDs <- function(){
@@ -344,18 +429,19 @@ setFlagIDs <- function(){
     df.flags <- NA
     fc <- 0
   }
-  ### Get discharge flags (if any) ####
+  ### NOTE: Flags for discharges above/below rating curve not generated here - only in HOBOB data ####
+  
+  # Get discharge flags (if any)
   #### Need to deal with condition where there are no regular flags in df.wq, but there are discharge flags
   #### This part needs to go above the SET ID function 
-  
-  if(nrow(ToCalc) > 0){
-      if(!is.na(df_QFlags)){
-        df_QFlags <-  df_QFlags %>%
-          mutate(SampleID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
-          select(-UNQID)
-        fc <- fc + 2
-      }
-  }
+  # if(nrow(ToCalc) > 0){
+  #     if(!is.na(df_QFlags)){
+  #       df_QFlags <-  df_QFlags %>%
+  #         mutate(SampleID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
+  #         select(-UNQID)
+  #       fc <- fc + 2
+  #     }
+  # }
   if(fc == 1){
     df.flags <- df.flags
   } else {
@@ -377,7 +463,8 @@ setFlagIDs <- function(){
       ID.max.flags <- as.numeric(unlist(query.flags))
       rm(query.flags)
       
-    ### ID flags ###
+      
+      ### ID flags
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
       df.flags$DataTableName <- ImportTable
       df.flags$DateFlagged <-  Sys.Date()
@@ -391,50 +478,46 @@ setFlagIDs <- function(){
 } # End set flags function
 df.flags <- setFlagIDs()
 
-########################################################################.
-###                        Check for unmatched times                ####
-########################################################################.
 
 ### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
 
 #Create empty dataframe
-unmatchedtimes <- df.wq[NULL,names(df.wq)]
-# Bring in tributary location IDs
-locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
-# Keep only locations of type "Tributary"
-df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
-rm(locations.tribs)
+# unmatchedtimes <- df.wq[NULL,]
+# # Bring in tributary location IDs
+# locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
+# # Keep only locations of type "Tributary"
+# df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
+# rm(locations.tribs)
+# 
+# # Only do the rest of the unmatched times check if there are tributary locations in data being processed
+# if(nrow(df.timecheck)>0){
+# 
+#   # Find earliest date in df.wq
+#   mindatecheck <- min(df.wq$SampleDateTime)
+#   # Retrieve all date/times from database from earliest in df.wq to present
+#   databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
+#     
+#   #Loop adds row for every record without matching location/date/time in database
+#   for (i in 1:nrow(df.timecheck)){
+#     if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+#       unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
+#    }}
+# 
+#   rm(mindatecheck, databasetimes)
+# 
+# }  
+#   
+# ### Print unmatchedtimes to log, if present
+# if (nrow(unmatchedtimes)>0){
+#   print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
+#   print(unmatchedtimes[c("ID","UniqueID","ResultReported")],print.gap=4,right=FALSE)
+# }
 
-# Only do the rest of the unmatched times check if there are tributary locations in data being processed
-if(nrow(df.timecheck)>0){
+# Reformatting 2 ####
 
-  # Find earliest date in df.wq
-  mindatecheck <- min(df.wq$SampleDateTime)
-  # Retrieve all date/times from database from earliest in df.wq to present
-  databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
-    
-  #Loop adds row for every record without matching location/date/time in database
-  for (i in 1:nrow(df.timecheck)){
-    if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
-      unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
-   }}
-
-  rm(mindatecheck, databasetimes)
-
-}  
-  
-### Print unmatchedtimes to log, if present
-if (nrow(unmatchedtimes)>0){
-  print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
-  print(unmatchedtimes[c("ID","UniqueID","ResultReported")],print.gap=4,right=FALSE)
-}
-
-########################################################################.
-###                           Final Reformatting                    ####
-########################################################################. 
-
-### Deselect Columns that do not need in Database ####
+### Deselect Columns that do not need in Database
 df.wq <- df.wq %>% select(-c(Description,
+                             LocTimes,
                              SampleDate,
                              FlagCode,
                              date,
@@ -442,16 +525,16 @@ df.wq <- df.wq %>% select(-c(Description,
                              )
 )
 
-# Reorder remaining 30 columns to match the database table exactly ####
+# Reorder remaining 30 columns to match the database table exactly
 col.order.wq <- dbListFields(con, ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
-### QC Test ####
+# QC Test
 source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
 qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
 print(qc_message)
 
-### Create a list of the processed datasets ####
+# Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
 dfs[[2]] <- path
@@ -462,9 +545,10 @@ dfs[[4]] <- unmatchedtimes # Samples with site/time combo not matching any recor
 dbDisconnect(con)
 rm(con)
 return(dfs)
-} # END FUNCTION ####
+} # END FUNCTION
 
-############## COMMENT OUT SECTION BELOW WHEN RUNNING SHINY #############.
+#### COMMENT OUT SECTION BELOW WHEN RUNNING SHINY
+########################################################################################################.
 # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, ImportTable = ImportTable, ImportFlagTable = ImportFlagTable)
 # #
@@ -474,27 +558,23 @@ return(dfs)
 # df.flags  <- dfs[[3]]
 # unmatchedtimes <- dfs[[4]]
 
-########################################################################.
-
-########################################################################.
-###                        Write data to Database                   ####
-########################################################################.
-
+########################################################################################################.
+##########################.
+# Write data to Database #
+##########################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 # df.flags is an optional argument
 
   con <-  odbcConnectAccess(filename.db)
 
-  # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
-
-  ### WQ Data ####
+  # WQ Data ####
   ColumnsOfTable <- sqlColumns(con, ImportTable)
   varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
   sqlSave(con, df.wq, tablename = ImportTable, append = T,
           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
-  ### Flag data ####
+  # Flag data ####
    if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
     sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
             rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
@@ -508,6 +588,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   ### Move the processed raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$SampleDateTime))) # Raw data archived by year, subfolders = Year
+  dir.create(processed_subdir)
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
   return("Import Successful")
