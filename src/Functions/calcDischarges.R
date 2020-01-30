@@ -1,20 +1,22 @@
-##############################################################################################################################
-#     Title: calcDischarges.R
-#     Description: This script is called from an import function with stage values - it uses rating information to calculate
+###############################  HEADER  ######################################
+#  TITLE: calcDischarges.R
+#  DESCRIPTION: This script is called from an import function with stage values - it uses rating information to calculate
 #                   discharges for each stage record
-#     Written by: Dan Crocker
-#     Last Update: April 2018
-#
-##############################################################################################################################
+#  AUTHOR(S): Dan Crocker
+#  DATE LAST UPDATED: 2020-01-30
+#  GIT REPO: WIT
+#  R version 3.5.3 (2019-03-11)  i386
+##############################################################################.
 
-# Load libraries needed
-  library(tidyverse)
-  library(odbc)
-  library(RODBC)
-  library(DBI)
-  library(lubridate)
-  library(magrittr)
-  library(dataRetrieval)
+
+# Load libraries needed ####
+  # library(tidyverse)
+  # library(odbc)
+  # library(RODBC)
+  # library(DBI)
+  # library(lubridate)
+  # library(magrittr)
+  # library(dataRetrieval)
 
 calcQ <- function(filename.db, stages) {
 # Set odbc connection  and get the rating table
@@ -170,7 +172,11 @@ df_HOBO <- HOBOcalc %>%
          Reportable = NA,
          ResultReported = as.character(df_Q$q_cfs)
          )
+} else {
+  df_QFlags <- NA 
 }
+
+### USGS ####
 
 if(nrow(USGScalc) > 0){
 count <- count + 2
