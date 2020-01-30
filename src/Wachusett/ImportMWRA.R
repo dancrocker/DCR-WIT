@@ -54,12 +54,6 @@ df.wq <- df.wq[,c(1:25)]
 
 # At this point there could be a number of checks to make sure data is valid
 
-  # Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
-  if (nrow(df.wq) != length(paste0(df.wq$SampleDate, df.wq$Location,df.wq$Parameter) %>% unique())) {
-    # Send warning message to UI that it appears that there are storm samples in the data
-    stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
-         \nCheck the file before proceeding and split storm samples into separate file to import")
-  }
   # Check to make sure there are 25 variables (columns)
   if (ncol(df.wq) != 25) {
     # Send warning message to UI if TRUE
@@ -119,6 +113,12 @@ names(df.wq) = c("SampleGroup",
                  "Method",
                  "DetectionLimit")
 
+# Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
+if (nrow(df.wq) != length(paste0(df.wq$SampleDate, df.wq$Location,df.wq$Parameter) %>% unique())) {
+  # Send warning message to UI that it appears that there are storm samples in the data
+  stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
+         \nCheck the file before proceeding and split storm samples into separate file to import")
+}
 
 ### Date and Time ####
 
