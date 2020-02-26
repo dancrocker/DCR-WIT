@@ -153,10 +153,10 @@ ui <- tagList(
                          ),
                          tabsetPanel(
                            tabPanel("Processed WQ Data",
-                                    dataTableOutput("table.process.wq")
+                                    DT::dataTableOutput("table.process.wq")
                            ),
                            tabPanel("Processed Flag Index Data",
-                                    dataTableOutput("table.process.flag")
+                                    DT::dataTableOutput("table.process.flag")
                            ) # End Tab Panel
                          ) # End Tabset Panel
                   ) # End Col
@@ -270,7 +270,7 @@ ui <- tagList(
                         fluidRow(column(12,
                                         strong(h4("5. Preview flag data before import:")),
                                           # tableOutput("previewtable"),
-                                          dataTableOutput("table.manual.flag"),
+                                          DT::dataTableOutput("table.manual.flag"),
                                           br()
                                 ) # End Column
                         ) # End Fluid Row
@@ -621,13 +621,13 @@ server <- function(input, output, session) {
 
   # Processed WQ Table - Only make table if processing is successful
   
-  output$table.process.wq <- renderDataTable({
+  output$table.process.wq <- DT::renderDataTable({
     req(try(df.wq()))
    df.wq()
   })
 
   # Processed Flag Table - Only make table if processing is successful
-  output$table.process.flag <- renderDataTable({
+  output$table.process.flag <- DT::renderDataTable({
     req(try(df.flags()))
     df.flags()
   })
@@ -742,7 +742,7 @@ server <- function(input, output, session) {
      })
   ### PROCESSED FLAGS TABLE ####
   # Processed Flag Table - Only make table if processing is successful
-  output$table.manual.flag <- renderDataTable({
+  output$table.manual.flag <- DT::renderDataTable({
     req(try(df.manualflags()))
     df.manualflags()
   })
