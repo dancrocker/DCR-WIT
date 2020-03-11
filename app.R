@@ -31,7 +31,7 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -99,6 +99,8 @@ dbDisconnect(con2)
 rm(con2)
 actionCount <- reactiveVal(0)
 
+### Set UI Theme ####
+mytheme <- "spacelab"
 ########################################################################.
 ###                      User Interface                             ####
 ########################################################################.
@@ -109,7 +111,7 @@ ui <- tagList(
       id = "form", # open div
       navbarPage("WQ DATA IMPORTER",
         tabPanel("Import Data",
-          fluidPage(theme = shinytheme("slate"),
+          fluidPage(theme = shinytheme(mytheme),
                 fluidRow(
                   column(1,
                     actionButton("refresh", "REFRESH"),
@@ -164,7 +166,7 @@ ui <- tagList(
           )  #End Fluid Page
         ), # End Tab panel
         tabPanel("Manually Flag Data",
-                 fluidPage(theme = shinytheme("slate"),
+                 fluidPage(theme = shinytheme(mytheme),
                            fluidRow(
                                 column(1,
                                   actionButton("refresh2", "REFRESH"),
@@ -623,7 +625,8 @@ server <- function(input, output, session) {
   
   output$table.process.wq <- DT::renderDataTable({
     req(try(df.wq()))
-   df.wq()
+    datatable(df.wq()) %>%
+      formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
   })
 
   # Processed Flag Table - Only make table if processing is successful
