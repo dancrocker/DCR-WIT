@@ -31,7 +31,7 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT", "rdrop2")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
