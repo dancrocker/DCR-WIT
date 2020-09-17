@@ -13,29 +13,23 @@ library(dplyr)
 
 ### Function compares df.qccheck records (in the format at the end of WIT processing before importing) to historical min/max and percentiles
 
-QCCHECK <- function(df.qccheck,file,ImportTable){
+QCCHECK <- function(df.qccheck, file, ImportTable){
 
 ### FETCH CACHED DATA FROM WAVE RDS FILES ####
-  datadir <- config[1]
- ### Make a list of all the .rds files using full path
- rds_files <- list.files(datadir,full.names = TRUE ,pattern = '\\.rds$')
- ### Select which rds files needed for this script
- rds_in <- c(38,34) # EDIT RDS FILES NEEDED HERE
- ### subset rds files (if you want all of them then skip rds_in and the following line)
- rds_files <- rds_files[rds_in]
- ### create an object that contains all of the rds files
- data <- lapply(rds_files, readRDS)
- ### Make a list of the df names by eliminating extension from files
- df_names <- gsub('.rds', '', list.files(datadir, pattern = '\\.rds$'))
- df_names <- df_names[rds_in]
- # name each df in the data object appropriately
- names(data) <- df_names
- ### Extract each element of the data object into the global environment
- list2env(data ,.GlobalEnv)
- ### Remove data
- rm(data)  
-
   
+  files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
+  
+  datadir <- config[1]
+  rds_files <- list.files(datadir, full.names = F ,pattern = ".rds")
+  rds_in <- which(rds_files %in% files) %>% as.numeric()
+  rds_files <- rds_files[rds_in]
+  data <- lapply(paste0(datadir,"/", files), readRDS)
+  df_names <- gsub('.rds', '', list.files(datadir, pattern = '.rds'))
+  df_names <- df_names[rds_in]
+  names(data) <- df_names
+  list2env(data ,.GlobalEnv)
+  rm(data)
+
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
 statoutliers<-mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
