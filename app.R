@@ -98,6 +98,7 @@ if (try(file.access(config[1], mode = 4)) == 0) {
 dbDisconnect(con2)
 rm(con2)
 actionCount <- reactiveVal(0)
+rdsList <- reactiveVal(0)
 
 ### Set UI Theme ####
 mytheme <- "spacelab"
@@ -327,6 +328,11 @@ server <- function(input, output, session) {
     req(ds())
     as.character(ds()$EmailList[1])
   })
+  
+  # rds_updates <- reactive({
+  #   req(ds())
+  #   as.character(ds()$rdsUpdateFx[1])
+  # })
 
 ### FILE SELECTION ####
 
@@ -625,8 +631,12 @@ server <- function(input, output, session) {
   
   output$table.process.wq <- DT::renderDataTable({
     req(try(df.wq()))
-    datatable(df.wq()) %>%
-      formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
+    if ("SampleDateTime" %in% names(df.wq())) {
+      datatable(df.wq()) %>%
+        formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
+    } else {
+      datatable(df.wq())
+    }
   })
 
   # Processed Flag Table - Only make table if processing is successful
@@ -665,6 +675,11 @@ server <- function(input, output, session) {
     # req(dsflags())
     as.character(dsflags()$EmailList[1])
   })
+  
+  # rds_updates2 <- reactive({
+  #   req(dsflags())
+  #   as.character(ds()$rdsUpdateFx[1])
+  # })
 
   flagsA <- reactive({
     # req(isTruthy(input$flagsA))
