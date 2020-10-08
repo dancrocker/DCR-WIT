@@ -635,7 +635,8 @@ server <- function(input, output, session) {
       datatable(df.wq()) %>%
         formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
     } else {
-      datatable(df.wq())
+      datatable(df.wq()) %>% 
+        formatDate(columns = c("SampleDate"), method = 'toLocaleString')
     }
   })
 
