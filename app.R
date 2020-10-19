@@ -31,7 +31,7 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT", "rdrop2")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT", "rdrop2", "callr")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -98,7 +98,7 @@ if (try(file.access(config[1], mode = 4)) == 0) {
 dbDisconnect(con2)
 rm(con2)
 actionCount <- reactiveVal(0)
-rdsList <- reactiveVal(0)
+rdsList <- reactiveVal(NULL)
 
 ### Set UI Theme ####
 mytheme <- "spacelab"
@@ -295,7 +295,7 @@ server <- function(input, output, session) {
 
 ### Generate function agruments from UI selections
 
-### Reactive dfs ####
+### Reactive dfs DATA ####
   ds <- reactive({
     filter(datasets, DataType == input$datatype)
   })
@@ -329,10 +329,10 @@ server <- function(input, output, session) {
     as.character(ds()$EmailList[1])
   })
   
-  # rds_updates <- reactive({
-  #   req(ds())
-  #   as.character(ds()$rdsUpdateFx[1])
-  # })
+  rds_updates <- reactive({
+    req(ds())
+    as.character(ds()$rdsUpdateFx[1])
+  })
 
 ### FILE SELECTION ####
 
@@ -550,7 +550,7 @@ server <- function(input, output, session) {
 
           # ImportFailed <- is.na(out)
 
-          if (out == 1){
+          if (out == 1) {
             removeModal()
             print(msg)
             import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
@@ -560,7 +560,10 @@ server <- function(input, output, session) {
                                   input$datatype, " | Filename = ", input$file)
             NewCount <- actionCount() + 1
             actionCount(NewCount)
-            print(paste0("Action Count was ", actionCount()))
+            new_rds_list <- c(paste0(rdsList()), rds_updates())
+            rdsList(new_rds_list)
+            print(paste0("Action Count is ", actionCount()))
+            print(paste0("RDS functions to call: ", rdsList()))
             ImportEmail()
           }
           removeModal()
@@ -651,7 +654,7 @@ server <- function(input, output, session) {
 ########################################################################.
 
 ### Generate function agruments from UI selections
-### Reactive dfs ####
+### Reactive dfs FLAGS ####
   dsflags <- reactive({
     filter(flagdatasets, DataType == input$flagdatatype)
   })
@@ -677,10 +680,10 @@ server <- function(input, output, session) {
     as.character(dsflags()$EmailList[1])
   })
   
-  # rds_updates2 <- reactive({
-  #   req(dsflags())
-  #   as.character(ds()$rdsUpdateFx[1])
-  # })
+  rds_updates2 <- reactive({
+    req(dsflags())
+    as.character(dsflags()$rdsUpdateFx[1])
+  })
 
   flagsA <- reactive({
     # req(isTruthy(input$flagsA))
@@ -782,19 +785,37 @@ server <- function(input, output, session) {
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
-                        df.manualflags = df.manualflags()),
-                        error = function(e) e)
-
-    ImportFailed <- any(class(out) == "error")
-    
-    if (ImportFailed == TRUE){
-      print(paste0("Flag Import Failed at ", Sys.time(), ". There was an error... see log file to troubleshoot."))
-      # print(out)
+                        df.manualflags = df.manualflags())
+                    ,
+                    error=function(cond) {
+                      msg <<- paste("Import Failed - There was an error at ", Sys.time(),
+                                    "...\n ", cond)
+                      # print(msg)
+                      return(1)
+                    },
+                    warning=function(cond) {
+                      msg <<- paste("Import process completed with warnings...\n", cond)
+                      print(msg)
+                      return(2)
+                    },
+                    finally={
+                      message(paste("Import Process Complete ..."))
+                    }
+    )
+    if (out == 1) {
+      removeModal()
+      print(msg)
+      flag_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
     } else {
       print(paste0("Flag Import Successful at ", Sys.time()))
+      flag_msg <<- paste0("Successful import of ", nrow(df.manualflags()), " new record(s) for the dataset: ",
+                            input$flagdatatype)
       NewCount <- actionCount() + 1
       actionCount(NewCount)
-      print(actionCount())
+      new_rds_list <- c(rdsList(), rds_updates2())
+      rdsList(new_rds_list)
+      print(paste0("Action Count is ", actionCount()))
+      print(paste0("RDS functions to call: ", rdsList()))
       FlagEmail()
     }
     removeModal()
@@ -825,7 +846,7 @@ server <- function(input, output, session) {
           return(warn)
         },
         finally={
-          message("Import Process Complete")
+          message("Email notification process Complete")
         }
       )
       return(out)
@@ -836,8 +857,8 @@ server <- function(input, output, session) {
     insertUI(
       selector = "#importFlags",
       where = "afterEnd",
-      ui = h4(paste("Successful import of", nrow(df.manualflags()), " flag record(s) to", flagtable(), "in", flag.db(), "Database"))
-    )
+      ui = h4(paste(flag_msg))
+      )
   })
 
   observeEvent(input$importFlags, {
@@ -874,7 +895,28 @@ server <- function(input, output, session) {
 
     if (isolate(actionCount()) > 0) {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
-              shell.exec(config[11])
+              print(paste0("RDS update functions to call: ", isolate(rdsList())))
+              rscript(
+                script = config[11], 
+                cmdargs = isolate(rdsList()),
+                libpath = config[15],
+                repos = default_repos(),
+                stdout = "updateWAVE.log",
+                stderr = "2>&1",
+                poll_connection = FALSE,
+                echo = FALSE,
+                show = FALSE,
+                callback = NULL,
+                block_callback = NULL,
+                spinner = FALSE,
+                system_profile = FALSE,
+                user_profile = FALSE,
+                env = rcmd_safe_env(),
+                timeout = Inf,
+                wd = config[13], 
+                fail_on_status = TRUE,
+                color = FALSE
+              )
           } else {
             print("Action Count was 0, data not modified in databases; New .rds files will not be generated")
           }

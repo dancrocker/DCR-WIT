@@ -24,7 +24,7 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords){ # St
 
    # probe is an optional argument
   options(scipen = 999) # Eliminate Scientific notation in numerical fields
-
+  
    # Connect to db for queries below
   con <- dbConnect(odbc::odbc(),
                    .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
@@ -72,27 +72,13 @@ IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags
 # Save the new records
   ColumnsOfTable <- sqlColumns(con, flagtable)
   varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-    sqlSave(con, df.manualflags, tablename = flagtable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
+  
+  sqlSave(con, df.manualflags, tablename = flagtable, append = T,
+            rownames = F, colnames = F, addPK = F , fast = T)
+  
   # Disconnect from db and remove connection obj
   odbcCloseAll()
   rm(con)
-
+  return("Import Successful")
 }
 # IMPORT_DATA(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
