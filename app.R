@@ -561,7 +561,7 @@ server <- function(input, output, session) {
             NewCount <- actionCount() + 1
             actionCount(NewCount)
             new_rds_list <- c(paste0(rdsList()), rds_updates())
-            rdsList(new_rds_list)
+            rdsList(unique(new_rds_list))
             print(paste0("Action Count is ", actionCount()))
             print(paste0("RDS functions to call: ", rdsList()))
             ImportEmail()
@@ -812,8 +812,8 @@ server <- function(input, output, session) {
                             input$flagdatatype)
       NewCount <- actionCount() + 1
       actionCount(NewCount)
-      new_rds_list <- c(rdsList(), rds_updates2())
-      rdsList(new_rds_list)
+      new_rds_list <- c(paste0(rdsList()), rds_updates2())
+      rdsList(unique(new_rds_list))
       print(paste0("Action Count is ", actionCount()))
       print(paste0("RDS functions to call: ", rdsList()))
       FlagEmail()
