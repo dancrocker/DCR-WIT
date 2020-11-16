@@ -157,8 +157,8 @@ df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filte
 df.wq$Location %<>%
   gsub("WACHUSET-","", .) %>%
   gsub("M754","MD75.4", .) %>% 
-  gsub("BMP1","FPRN", .) %>%
-  gsub("BMP2","FHLN", .) %>%
+  gsub("BMP1","PRNW", .) %>%
+  gsub("BMP2","HLNW", .) %>%
   gsub("QUABBINT-","", .) %>%
   gsub("QUABBIN-","", .)
 
