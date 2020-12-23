@@ -50,11 +50,12 @@ con2 <- dbConnect(odbc::odbc(),
 source("src/Functions/outlook_email.R", local = T)
 
 # Set user info
-user <-  Sys.getenv("USERNAME")
+user <-  Sys.getenv("USERNAME") %>% toupper()
 userdata <- readxl::read_xlsx(path = config[17])
-username <- paste(userdata$FirstName[userdata$Username %in% user],userdata$LastName[userdata$Username %in% user],sep = " ")
-useremail <- userdata$Email[userdata$Username %in% user]
-userlocation <- userdata$Location[userdata$Username %in% user]
+userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
+username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
+useremail <- userinfo$Email[1]
+userlocation <- userinfo$Location[1]
 
 # Specify mail server
 MS <- config[5]
