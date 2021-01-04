@@ -41,11 +41,7 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
 ipak(packages)
 
 library(RDCOMClient)
-# Connect to db for queries below
-con2 <- dbConnect(odbc::odbc(),
-                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                             paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"),
-                  timezone = "America/New_York")
+ 
 
 source("src/Functions/outlook_email.R", local = T)
 
@@ -56,9 +52,21 @@ userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
 userlocation <- userinfo$Location[1]
-
+schema <- userlocation
 # Specify mail server
 MS <- config[5]
+
+### Connect to Database  
+### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
+# database <- 'DCR_DWSP'
+# tz <- 'America/New_York'
+# con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
+  
+
+con2 <- dbConnect(odbc::odbc(),
+        .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
+        paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"), timezone = "America/New_York")
+
 
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
@@ -76,10 +84,11 @@ if (userlocation == "Wachusett") {
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
 if (try(file.access(config[1], mode = 4)) == 0) {
+  # flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
   flags <- dbReadTable(con2, "tblFlags") %>%
     select(-3)
   flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
-} else {
+  
   ### Get df Flags from Dropbox rds files
   df_flags_url <- config[30]
   datadir <- paste0(getwd(), "/rds_files")
