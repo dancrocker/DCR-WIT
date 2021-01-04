@@ -174,7 +174,7 @@ df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m
 ###                         Calculate Discharges                    ####
 ########################################################################.
 
-ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
+ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings")) ### Dates get converted to UTC
 ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$IsCurrent == TRUE], Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
@@ -487,13 +487,11 @@ return(dfs)
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 # df.flags is an optional argument
 
-  con <-  odbcConnectAccess(filename.db)
-
   ### CONNECT TO DATABASE ####
   ### Set DB
   database <- filename.db
   schema <- 'Wachusett'
-  tz <- 'America/New_York'
+  tz <- 'UTC'
   ### Connect to Database 
   con <- dbConnect(odbc::odbc(), database, timezone = tz)
 

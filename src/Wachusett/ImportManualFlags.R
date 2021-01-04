@@ -27,29 +27,17 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords, comme
 ### Connect to DB - need temporary logic to choose Access vs SQL Server  
   flag <- as.numeric(flag)
   
-  if( usertype = 2) {
-    con <- dbConnect(odbc::odbc(),
-                     .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                                paste0("DBQ=", flag.db), "Uid=Admin;Pwd=;", sep = ";"),
-                     timezone = "America/New_York")
-    # Get current maximum record ID from the data table
-    maxSampleID <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", datatable))
-    maxSampleID <- as.numeric(unlist(maxSampleID))
-    # Get current maximum ID from the associated flag index table
-    
-    query.flags <- dbGetQuery(con,paste0("SELECT max(ID) FROM ", flagtable))
-  } else {
-    database <- 'DCR_DWSP'
-    schema <- userlocation
-    tz <- 'America/New_York'
-    con <- dbConnect(odbc::odbc(), database, timezone = tz)
-    # Get current maximum record ID from the data table
-    maxSampleID <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{datatable}]"))
-    maxSampleID <- as.numeric(unlist(maxSampleID))
-    # Get current maximum ID from the associated flag index table
-    
-    query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{flagtable}]"))
-  } 
+  database <- 'DCR_DWSP'
+  schema <- userlocation
+  tz <- 'UTC'
+  con <- dbConnect(odbc::odbc(), database, timezone = tz)
+  # Get current maximum record ID from the data table
+  maxSampleID <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{datatable}]"))
+  maxSampleID <- as.numeric(unlist(maxSampleID))
+  # Get current maximum ID from the associated flag index table
+  
+  query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{flagtable}]"))
+  
   dbDisconnect(con)
   rm(con)
   
@@ -79,29 +67,13 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords, comme
 
 IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags, usertype, userlocation){
 
-  if( usertype = 2) {
-    # Connect to db using ODBC
-    con <-  odbcConnectAccess(flag.db)
-    
-    # Save the new records
-    ColumnsOfTable <- sqlColumns(con, flagtable)
-    varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-    
-    sqlSave(con, df.manualflags, tablename = flagtable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-    # Disconnect from db and remove connection obj
-    odbcCloseAll()
-    rm(con)
-    
-  } else {
     database <- 'DCR_DWSP'
     schema <- userlocation
-    tz <- 'America/New_York'
+    tz <- 'UTC'
     con <- dbConnect(odbc::odbc(), database, timezone = tz)
     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{flagtable}")), value = df.manualflags, append = TRUE)
     dbDisconnect(con)
     rm(con)
-  }   
   
   return("Import Successful")
 }
