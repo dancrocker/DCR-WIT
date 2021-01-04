@@ -31,7 +31,7 @@ ipak <- function(pkg){
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT", "rdrop2", "callr")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -51,13 +51,15 @@ userdata <- readxl::read_xlsx(path = config[17])
 userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
-userlocation <- userinfo$Location[1]
-schema <- userlocation
+userlocation <<- userinfo$Location[1]
+usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
+schema <<- userlocation
 # Specify mail server
 MS <- config[5]
 
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
+
 # database <- 'DCR_DWSP'
 # tz <- 'America/New_York'
 # con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
@@ -259,9 +261,18 @@ ui <- tagList(
                                   ) # End Well Panel
                             )# End Column
                         ), # End Fluid Row
+                        fluidRow(column(12,
+                                        wellPanel(
+                                          strong(h4("4. Add comment to apply to these flagged records (Optional):")),
+                                          uiOutput("AddComment.UI"),
+                                          textOutput("E"),
+                                          br()
+                                        )
+                                )
+                        ),
                         fluidRow(column(6,
                                     wellPanel(
-                                      strong(h4("4. Prepare flag data for import:")),
+                                      strong(h4("5. Prepare flag data for import:")),
                                       br(),
                                       uiOutput("processflags.UI"),
                                       br(),
@@ -272,7 +283,7 @@ ui <- tagList(
                                 ),
                                 column(6,
                                     wellPanel(
-                                      strong(h4("6. Import flag data :")),
+                                      strong(h4("7. Import flag data :")),
                                       br(),
                                       uiOutput("importFlags.UI"),
                                       br(),
@@ -281,7 +292,7 @@ ui <- tagList(
                                 )
                         ),
                         fluidRow(column(12,
-                                        strong(h4("5. Preview flag data before import:")),
+                                        strong(h4("6. Preview flag data before import:")),
                                           # tableOutput("previewtable"),
                                           DT::dataTableOutput("table.manual.flag"),
                                           br()
@@ -685,9 +696,10 @@ server <- function(input, output, session) {
     as.numeric(substr(input$flag, 1, 3))
     })
 
-  distro2 <- reactive({
-    # req(dsflags())
-    as.character(dsflags()$EmailList[1])
+  flagComment <- reactive({
+    req(input$FlagComment)
+    paste0("Comment for flagged records: ", input$FlagComment)
+
   })
   
   rds_updates2 <- reactive({
@@ -732,6 +744,14 @@ server <- function(input, output, session) {
     combined <- lapply(x, function(x) x[!is.na(x)])
     flagRecords <- unique(Reduce(c,combined))
   })
+  
+  flagComment <- reactive({
+    if(isTruthy(input$flag_comment)) {
+      input$flag_comment %>% str_squish() %>% strtrim(150)
+    } else {
+      NA_character_
+    }
+  })
 
   # Preview each output
   output$A <- renderText({
@@ -753,9 +773,25 @@ server <- function(input, output, session) {
       req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
       paste0(length(flagRecords()), " records have been marked for flagging: ", list(flagRecords()))
     })
+  
+  output$E <- renderText({
+    req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
+    req(isTruthy(input$flag_comment))
+    glue("Comment for flagged records: {input$flag_comment %>% str_squish() %>% strtrim(150)}")
+  })
 
   ### PROCESS FLAGS ####
-
+  
+  ### FLAG COMMENT ####
+  
+  output$AddComment.UI <- renderUI({
+    req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
+    textInput(inputId = "flag_comment", 
+              label = "",
+              placeholder = "Max 150 characters",
+              width = "100%")
+  })
+  
   ### PROCESS MANUAL FLAGS UI ####
   output$processflags.UI <- renderUI({
     req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
@@ -768,7 +804,9 @@ server <- function(input, output, session) {
   df.manualflags <- eventReactive(input$processflags, {
     showModal(busyModal(msg = "Processing flags..."))
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
+    df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), 
+                                   flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords(), 
+                                   comment = flagComment(), usertype = usertype, userlocation = userlocation)
     removeModal()
     return(df.manualflags)
      })
@@ -795,7 +833,7 @@ server <- function(input, output, session) {
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
-                        df.manualflags = df.manualflags())
+                        df.manualflags = df.manualflags(), usertype = usertype, userlocation = userlocation)
                     ,
                     error=function(cond) {
                       msg <<- paste("Import Failed - There was an error at ", Sys.time(),

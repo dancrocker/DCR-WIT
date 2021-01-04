@@ -76,28 +76,28 @@ df.wq <- df.wq[,c(1:25)]
   }
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
-# Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
+### Connect to Database   
+database <- filename.db
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
 ########################################################################.
 
 ### Rename Columns in Raw Data ####
-names(df.wq) = c("SampleGroup",
+names(df.wq) <-  c("SampleGroup",
                  "SampleNumber",
                  "TextID",
                  "Location",
                  "Description",
                  "TripNum",
-                 "LabRecDate",
+                 "LabRecDateET",
                  "SampleDate",
                  "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
+                 "PrepOnET",
+                 "DateTimeAnalyzedET",
                  "AnalyzedBy",
                  "Analysis",
                  "ReportedName",
@@ -129,7 +129,7 @@ df.wq$SampleDate <- as.Date(df.wq$SampleDate)
 df.wq <- separate(df.wq, SampleTime, into = c("date", "Time"), sep = " ")
 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 ### Fix other data types ####
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -138,7 +138,7 @@ df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
 ### Fix the Parameter names ####  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 ### Remove records with missing elements/uneeded data ####
@@ -163,23 +163,23 @@ df.wq$Location %<>%
   gsub("QUABBIN-","", .)
 
 ########################################################################.
-###                           Add new Columns                       ####
+###                           Add Unique ID                      ####
 ########################################################################.
 
 ### Unique ID number ####
-df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+df.wq$UniqueID <- NA_character_
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
 ########################################################################.
 ###                         Calculate Discharges                    ####
 ########################################################################.
 
-ratings <- dbReadTable(con, "tblRatings")
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$Current == TRUE], Parameter == "Staff Gauge Height")
+ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
+ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$IsCurrent == TRUE], Parameter == "Staff Gauge Height")
 if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   # call function in separate script to create df of discharges and df of flags to bind to main dfs
   source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
-  Q_dfs <- calcQ(filename.db = filename.db, stages = ToCalc)
+  Q_dfs <- calcQ(userlocation = userlocation, filename.db = filename.db, stages = ToCalc)
   # Extract the 2 dfs out of the list
   df_Q <- Q_dfs$df_Q
   df_QFlags <- Q_dfs$df_QFlags
@@ -205,8 +205,8 @@ if (length(dupes) > 0){
 }
 ### Make sure records are not already in DB ####
 
-Uniq <- dbGetQuery(con, paste0("SELECT UniqueID, ID FROM ", ImportTable))
-flags <- dbGetQuery(con, paste0("SELECT SampleID, FlagCode FROM ", ImportFlagTable," WHERE FlagCode = 102"))
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
@@ -220,11 +220,14 @@ Eliminate all duplicates before proceeding.",
 rm(Uniq)
 
 ### DataSource ####
-df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
+df.wq <- df.wq %>% 
+  mutate(DataSource = paste0("MWRA_", file),
+         Imported_By = username,
+         QAQC_By = NA_character_)
 
 ### DataSourceID ####
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -282,26 +285,26 @@ df.wq$ImportDate <- Sys.Date()
 ########################################################################.
 
 # Calculate the date range of import ####
-datemin <- min(df.wq$SampleDateTime)
-datemax <- max(df.wq$SampleDateTime)
+datemin <- min(df.wq$DateTimeET)
+datemax <- max(df.wq$DateTimeET)
 
 # IDs to look for - all records in time peroid in question
-qry <- paste0("SELECT (ID) FROM ", ImportTable, " WHERE (SampleDateTime) >= #", datemin, "# AND (SampleDateTime) <= #", datemax,"#")
+qry <- glue("SELECT (ID) FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
 query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
 
 if (nrow(query.prelim) > 0) {# If true there is at least one record in the time range of the data
   # SQL query that finds matching sample ID from tblSampleFlagIndex Flagged 102 within date range in question
-  qryS <- paste0("SELECT SampleID FROM ", ImportFlagTable, " WHERE FlagCode = 102 AND SampleID IN (", paste0(query.prelim$ID, collapse = ","), ")")
+  qryS <- glue("SELECT [SampleID] FROM [{schema}].[{ImportFlagTable}] WHERE [FlagCode] = 102 AND [SampleID] IN ({paste0(query.prelim$ID, collapse = ",")})")
   qryDelete <- dbGetQuery(con,qryS) # Check the query to see if it returns any matches
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
   if(nrow(qryDelete) > 0) {
-    qryDeletePrelimData <- paste0("DELETE * FROM ", ImportTable," WHERE ID IN (", paste0(qryDelete$SampleID, collapse = ","), ")")
+    qryDeletePrelimData <- glue("DELETE * FROM [{schema}].[{ImporTable}] WHERE [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
     rs <- dbSendStatement(con,qryDeletePrelimData)
     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
     dbClearResult(rs)
 
 # Next delete all flags associated with preliminary data - Will also delete any other flag associated with record number
-    qryDeletePrelimFlags <- paste0("DELETE * FROM ", ImportFlagTable, " WHERE SampleID IN (", paste0(qryDelete$SampleID, collapse = ","), ")")
+    qryDeletePrelimFlags <- glue("DELETE * FROM [{schema}].[{ImportFlagTable}] WHERE [SampleID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
     rs <- dbSendStatement(con, qryDeletePrelimFlags)
     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
     dbClearResult(rs)
@@ -315,7 +318,7 @@ if (nrow(query.prelim) > 0) {# If true there is at least one record in the time 
 # Read Tables
 # WQ ####
 setIDs <- function(){
-query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
 # Get current max ID
 if(is.na(query.wq)) {
   query.wq <- 0
@@ -367,7 +370,7 @@ setFlagIDs <- function(){
   }
       
   if(class(df.flags) == "data.frame"){
-      query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
+      query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
       if(is.na(query.flags)) {
         query.flags <- 0
@@ -382,9 +385,10 @@ setFlagIDs <- function(){
       df.flags$DataTableName <- ImportTable
       df.flags$DateFlagged <-  Sys.Date()
       df.flags$ImportStaff <-  username
+      df.flags$Comment <- "Flag automatically added at import"
     
       # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-      df.flags <- df.flags[,c(3,4,1,2,5,6)]
+      df.flags <- df.flags[,c(3,4,1,2,5,6,7)]
   } else { # Condition TRUE - All FlagCodes are NA, thus no df.flags needed, assign NA
     df.flags <- NA
   } # End flags processing chunk
@@ -400,7 +404,7 @@ df.flags <- setFlagIDs()
 #Create empty dataframe
 unmatchedtimes <- df.wq[NULL,names(df.wq)]
 # Bring in tributary location IDs
-locations.tribs <- na.omit(dbGetQuery(con, "SELECT LocationMWRA FROM tblLocations WHERE LocationType ='Tributary'"))
+locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[{tblLocations}] WHERE [LocationType] ='Tributary'")))
 # Keep only locations of type "Tributary"
 df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
 rm(locations.tribs)
@@ -409,13 +413,13 @@ rm(locations.tribs)
 if(nrow(df.timecheck)>0){
 
   # Find earliest date in df.wq
-  mindatecheck <- min(df.wq$SampleDateTime)
-  # Retrieve all date/times from database from earliest in df.wq to present
-  databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
+  mindatecheck <- min(df.wq$DateTimeET)
+  # Retrieve all date/times from database from earliest in df.wq to present - from Field Parameter table
+  databasetimes <- dbGetQuery(con, glue("SELECT [DateTimeET], [Location FROM] [{schema}].[{tblTribFieldParameters}] WHERE [DateTimeET] >= '{mindatecheck}'"))  
     
   #Loop adds row for every record without matching location/date/time in database
   for (i in 1:nrow(df.timecheck)){
-    if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+    if ((df.timecheck$DateTimeET[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$DateTimeET) == FALSE){
       unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
    }}
 
@@ -474,7 +478,6 @@ return(dfs)
 # df.flags  <- dfs[[3]]
 # unmatchedtimes <- dfs[[4]]
 
-########################################################################.
 
 ########################################################################.
 ###                        Write data to Database                   ####
@@ -486,28 +489,29 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   con <-  odbcConnectAccess(filename.db)
 
-  # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
+  ### CONNECT TO DATABASE ####
+  ### Set DB
+  database <- filename.db
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  ### Connect to Database 
+  con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
-  ### WQ Data ####
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
   ### Flag data ####
    if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
+     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
    } else {
-    print("There were no flags to import")
-  }
+     print("There were no flags to import")
+   }
 
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   ### Move the processed raw data file to the processed folder ####
-  processed_subdir <- paste0("/", max(year(df.wq$SampleDateTime))) # Raw data archived by year, subfolders = Year
+  processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
   return("Import Successful")

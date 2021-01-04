@@ -74,47 +74,43 @@ df.wq <- df.wq[,c(1:26)]
   }
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
-### Connect to db for queries below ####
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
-
-params <- dbReadTable(con,"tblParameters")
-dbDisconnect(con)
-rm(con)
+### Connect to Database   
+database <- filename.db
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
 ########################################################################.
 
 ### Rename Columns in Raw Data
-names(df.wq) = c("SampleGroup",
-                 "SampleNumber",
-                 "TextID",
-                 "Location",
-                 "Description",
-                 "TripNum",
-                 "LabRecDate",
-                 "SampleDate",
-                 "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
-                 "AnalyzedBy",
-                 "Analysis",
-                 "ReportedName",
-                 "Parameter",
-                 "ResultReported",
-                 "Units",
-                 "Comment",
-                 "SampledBy",
-                 "Status",
-                 "EDEP_Confirm",
-                 "EDEP_MW_Confirm",
-                 "Reportable",
-                 "Method",
-                 "DetectionLimit",
-                 "StormSampleN")
+names(df.wq) <- c("SampleGroup",
+                  "SampleNumber",
+                  "TextID",
+                  "Location",
+                  "Description",
+                  "TripNum",
+                  "LabRecDateET",
+                  "SampleDate",
+                  "SampleTime",
+                  "PrepOnET",
+                  "DateTimeAnalyzedET",
+                  "AnalyzedBy",
+                  "Analysis",
+                  "ReportedName",
+                  "Parameter",
+                  "ResultReported",
+                  "Units",
+                  "Comment",
+                  "SampledBy",
+                  "Status",
+                  "EDEP_Confirm",
+                  "EDEP_MW_Confirm",
+                  "Reportable",
+                  "Method",
+                  "DetectionLimit",
+                  "StormSampleN")
 
 
 ### Date and Time ####
@@ -126,7 +122,7 @@ df.wq$SampleDate <- as.Date(df.wq$SampleDate)
 df.wq <- separate(df.wq, SampleTime, into = c("date", "Time"), sep = " ")
 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 ### Fix other data types ####
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -135,7 +131,7 @@ df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
 ### Fix the Parameter names - from MWRA name to ParameterName ####
-
+params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 ### Remove problematic Records ####
@@ -196,21 +192,20 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 ###                Get Discharges From HOBO Data                    ####                  
 ########################################################################.
 
-# Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
+### Connect in UTC timezone, times come back in local timezone
+tz <- 'UTC'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
 locs <- df.wq$Location %>% unique()
 
 ### Placeholder for fetching USGS Instantaneous Values from NWIS ####
 
-times <- df.wq$SampleDateTime %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
+times <- df.wq$DateTimeET %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
 
 ### Pull hobo recs with matching timestamps
-qry_hobo_rec <- paste0("SELECT * FROM tbl_HOBO WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
+qry_hobo_rec <- paste0("SELECT * FROM [", schema ,"].[tbl_HOBO] WHERE [Location] IN (", paste0("'",locs,"'", collapse = ","),") AND [DateTimeUTC] IN (", paste0("'", times,"'", collapse = ","), ")") 
 hobo_rec <- dbGetQuery(con, qry_hobo_rec)
+
 dbDisconnect(con)
 rm(con)
 
@@ -221,7 +216,7 @@ if(any(!times %in% unique(hobo_rec$DateTimeUTC))) {
 
 ### Match by Location and Time
 # Get Sample Loc-Times 
-LocTimes <- paste0(df.wq$Location,"-",df.wq$SampleDateTime)
+LocTimes <- paste0(df.wq$Location,"-", df.wq$DateTimeET)
 df.wq$LocTimes <- LocTimes
 ### Convert hobo timestamps to local time
 hobo_rec$DateTimeUTC <- with_tz(hobo_rec$DateTimeUTC, "America/New_York") 
@@ -241,12 +236,11 @@ hobo_rec <- hobo_rec[which(hobo_locTimes %in% LocTimes),]
 
 hobo_rec <- hobo_rec %>% 
   select(c(2,3,6:7)) %>% # Temperature not selected since it comes in with field parameters also, would cause dups if included
-  rename("SampleDateTime" = "DateTimeET", 
-         "Staff Gauge Height" = "Stage_ft", 
+  rename("Staff Gauge Height" = "Stage_ft", 
          "Discharge" = "Discharge_cfs") %>% 
   gather(key = "Parameter", value = "FinalResult", 3:4) %>% 
   mutate("Units" = params$ParameterUnits[match(.$Parameter, params$ParameterName)],
-         "LocTime" = paste0(.$Location, "-", .$SampleDateTime))
+         "LocTime" = paste0(.$Location, "-", .$DateTimeET))
 ### Add StormID
 hobo_rec <- hobo_rec %>% 
   mutate("StormSampleN" = df.wq$StormSampleN[match(.$LocTime, df.wq$LocTimes)],
@@ -265,7 +259,7 @@ con <- dbConnect(odbc::odbc(),
                  timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
 # Below 2 lines same as above (can be deleted)
 # locs <- df.wq$Location %>% unique()
-# times <- df.wq$SampleDateTime %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
+# times <- df.wq$DateTimeET %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
 
 ### Pull hobo recs with matching timestamps
 qry_fp_rec <- paste0("SELECT * FROM tblStormFieldParameters WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
@@ -278,7 +272,7 @@ if(any(!times %in% unique(fp_rec$DateTimeUTC))) {
 
 ### Match by Location and Time
 # Get Sample Loc-Times 
-# LocTimes <- paste0(df.wq$Location,"-",df.wq$SampleDateTime)
+# LocTimes <- paste0(df.wq$Location,"-",df.wq$DateTimeET)
 
 ### Convert field parameter timestamps to local time
 fp_rec$DateTimeUTC <- with_tz(fp_rec$DateTimeUTC, "America/New_York") 
@@ -298,8 +292,7 @@ fp_rec <- fp_rec[which(fp_locTimes %in% LocTimes),]
 
 fp_rec <- fp_rec %>% 
   select(c(2:8)) %>% 
-  rename("SampleDateTime" = "DateTimeET", 
-         "Water Temperature" = "Water_temp_c", 
+  rename("Water Temperature" = "Water_temp_c", 
           "Specific Conductance" = "Conductivity_uScm",
           "Dissolved Oxygen" = "Dissolved_Oxygen_mgL") %>% 
   gather(key = "Parameter", value = "FinalResult", 4:7) %>% 
@@ -316,23 +309,23 @@ df.wq <- df.wq %>%
   bind_rows(hobo_rec) %>% 
   bind_rows(fp_rec)
 
-df.wq$LocTime <-  paste0(df.wq$Location,"-",df.wq$SampleDateTime)  
+df.wq$LocTime <-  paste0(df.wq$Location,"-",df.wq$DateTimeET)  
 
 ### Update the storm sample numbers ####
 for (loc in unique(df.wq$Location)){
-  times <- df.wq$SampleDateTime[df.wq$Location == loc] %>% unique() %>% sort()
+  times <- df.wq$DateTimeET[df.wq$Location == loc] %>% unique() %>% sort()
   for (i in seq_along(times)) {
-    df.wq$StormSampleN[df.wq$Location == loc & df.wq$SampleDateTime == times[i]] <- paste0(df.wq$StormSampleN[df.wq$Location == loc & df.wq$SampleDateTime == times[i]], "-", i)
+    df.wq$StormSampleN[df.wq$Location == loc & df.wq$DateTimeET == times[i]] <- paste0(df.wq$StormSampleN[df.wq$Location == loc & df.wq$DateTimeET == times[i]], "-", i)
   }
 }
 
 ########################################################################.
-###                         Add new Columns                         ####
+###                         Add Unique ID                       ####
 ########################################################################.
 
 ### Unique ID number ####
 df.wq$UniqueID <- NA_character_
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
 ########################################################################.
 ###                        Check for Duplicates                     ####
@@ -368,7 +361,7 @@ rm(Uniq)
 ### DataSourceID ####
 
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -493,13 +486,13 @@ df.flags <- setFlagIDs()
 # if(nrow(df.timecheck)>0){
 # 
 #   # Find earliest date in df.wq
-#   mindatecheck <- min(df.wq$SampleDateTime)
+#   mindatecheck <- min(df.wq$DateTimeET)
 #   # Retrieve all date/times from database from earliest in df.wq to present
-#   databasetimes <- dbGetQuery(con, paste0("SELECT SampleDateTime, Location FROM ", ImportTable," WHERE SampleDateTime >= #",mindatecheck,"#"))  
+#   databasetimes <- dbGetQuery(con, paste0("SELECT DateTimeET, Location FROM ", ImportTable," WHERE DateTimeET >= #",mindatecheck,"#"))  
 #     
 #   #Loop adds row for every record without matching location/date/time in database
 #   for (i in 1:nrow(df.timecheck)){
-#     if ((df.timecheck$SampleDateTime[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$SampleDateTime) == FALSE){
+#     if ((df.timecheck$DateTimeET[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$DateTimeET) == FALSE){
 #       unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
 #    }}
 # 
@@ -587,7 +580,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   rm(con)
 
   ### Move the processed raw data file to the processed folder ####
-  processed_subdir <- paste0("/", max(year(df.wq$SampleDateTime))) # Raw data archived by year, subfolders = Year
+  processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   dir.create(processed_subdir)
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))

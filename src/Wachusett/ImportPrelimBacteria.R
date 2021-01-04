@@ -393,7 +393,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   odbcCloseAll()
   rm(con)
 
-  #Move Preliminary csv files to the processed data folder
+  # Move Preliminary csv files to the processed data folder
   rawdatafolder <- str_sub(path, 1, nchar(path) - 20)
   filelist <- grep(
     x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
@@ -402,7 +402,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     perl =T)
 
   filelist2 <- paste0(rawdatafolder,"/", filelist)
-  file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/", filelist))
+  file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))
   return("Import Successful")
 }
 ### END

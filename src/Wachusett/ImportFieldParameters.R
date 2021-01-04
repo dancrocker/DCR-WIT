@@ -1,17 +1,17 @@
-##############################################################################################################################
+#################################################################################################.
 #     Title: ImportFieldParameters.R
 #     Description: This script will Format/Process/Import YSI, turbidity, and stage data
 #     Written by: Dan Crocker & Travis Drury
 #     Last Update: November 2019
 #    This script will process and import Wachusett Turbidity data to the WQ Database
 #
-##############################################################################################################################
+##################################################################################################.
 
 # NOTE - THIS SECTION IS FOR TESTING THE FUNCTION OUTSIDE SHINY
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # Load libraries needed
-# 
+
 # library(tidyverse)
 # library(stringr)
 # library(odbc)
@@ -25,13 +25,13 @@
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
-##############
+##############.
 # PREP DATA  #  # Function to Prep Data for use with Import Function
-##############
+##############.
 
 PREP_DATA <- function(file){
 
-  ########################################################
+  ########################################################.
   # Set system environments (Future - try to set this up to be permanent)
   Sys.setenv("R_ZIPCMD" = "C:/Rtools/bin/zip.exe")
   Sys.setenv(PATH = paste("C:/Rtools/bin", Sys.getenv("PATH"), sep=";"))
@@ -39,13 +39,10 @@ PREP_DATA <- function(file){
   # Check system environments
   # Sys.getenv("R_ZIPCMD", "zip")
   # Sys.getenv("PATH") # Rtools should be listed now
-  ########################################################
+  ########################################################.
 
 wb <- file
-
-
 wbobj <- loadWorkbook(wb)
-
 
 # Extract the full data from the sheet
 data <- openxlsx::read.xlsx(wbobj, sheet =  1, startRow = 1, colNames = T, cols = c(2:14))
@@ -63,11 +60,11 @@ if (all(colnames(data)!=expectedcolumns)){
 }
 
 
-# Get the data in order and formatted
+# Get the data in order and formatted ####
     df <- gather(data,Parameter,FinalResult,3:6,11,12)
     df$Timestamp <- XLDateToPOSIXct(df$Timestamp)
     df <- separate(df, Timestamp, into = c("Date", "Time"), sep = " ")
-    df$SampleDateTime <- as.POSIXct(paste(as.Date(df$Date, format ="%Y-%m-%d"), df$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
+    df$DateTimeET <- as.POSIXct(paste(as.Date(df$Date, format ="%Y-%m-%d"), df$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
     df <- df[,-c(2,3,6,7)]
     df <- dplyr::rename(df, "Location" = Site, "DataSource" = Source.Name, "SampledBy" = Sampled.By)
 
@@ -76,9 +73,7 @@ if (all(colnames(data)!=expectedcolumns)){
     df$SampledBy <- as.factor(df$SampledBy)
     df$Parameter <- as.factor(df$Parameter)
     
-    
-
-# Rename parameters factors
+# Rename parameters factors ####
     levels(df$Parameter)[levels(df$Parameter)=="Dissolved.Oxygen.(mg/L)"] <-"Dissolved Oxygen"
     levels(df$Parameter)[levels(df$Parameter)=="pH_1.(Units)"] <-"pH"
     levels(df$Parameter)[levels(df$Parameter)=="Specific.Conductance.(uS/cm)"] <-"Specific Conductance"
@@ -86,8 +81,7 @@ if (all(colnames(data)!=expectedcolumns)){
     levels(df$Parameter)[levels(df$Parameter)=="Temperature.(C)"] <-"Water Temperature"
     levels(df$Parameter)[levels(df$Parameter)=="Turbidity.(NTU)"] <-"Turbidity NTU"
     
-    
-# Create column for units
+# Create column for units ####
     df$Units <- NA
     df$Units <- ifelse(df$Parameter=="Dissolved Oxygen","mg/L",
                 ifelse(df$Parameter=="pH","pH",
@@ -97,28 +91,25 @@ if (all(colnames(data)!=expectedcolumns)){
                 ifelse(df$Parameter=="Turbidity NTU","NTU",NA
                        ))))))
     
-# Round times
-    
+# Round times ####
 
-    # Connect to db for query below
-    filename.db = filename.db()
-    
-    con <- dbConnect(odbc::odbc(),
-                     .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                                paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                     timezone = "America/New_York")
-    locations <- dbReadTable(con,"tblLocations")
+    ### Connect to Database   
+    database <- filename.db
+    tz <- 'America/New_York'
+    con <- dbConnect(odbc::odbc(), database, timezone = tz)
+
+    locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
     flowlocations <- filter(locations, !is.na(LocationFlow))
     
-    df$SampleDateTime <- round_date(df$SampleDateTime,"minute")
+    df$DateTimeET <- round_date(df$DateTime,"minute")
     
-    df$SampleDateTime <- ifelse(df$Location=="MD04",
-                                round_date(df$SampleDateTime,"10 minutes"),
+    df$DateTimeET <- ifelse(df$Location=="MD04",
+                                round_date(df$DateTimeET,"10 minutes"),
                                 ifelse(df$Location %in% flowlocations$LocationMWRA,
-                                round_date(df$SampleDateTime,"15 minutes"),
-                                df$SampleDateTime))
+                                round_date(df$DateTimeET,"15 minutes"),
+                                df$DateTimeET))
     
-    df$SampleDateTime <- as.POSIXct(df$SampleDateTime, origin="1970-01-01 00:00:00", format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = F)
+    df$DateTimeET <- as.POSIXct(df$DateTimeET, origin="1970-01-01 00:00:00", format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = F)
     
     dbDisconnect(con)
     rm(con)
@@ -157,9 +148,9 @@ if (all(colnames(data)!=expectedcolumns)){
 
 
 
-#############################
+#############################.
 #   PROCESSING FUNCTION    #
-############################
+############################.
 
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 
@@ -201,13 +192,13 @@ df.wq <- df.wq[,c(1:25)]
 
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
-#################################
-#  START REFORMATTING THE DATA  #
-#################################
+database <- filename.db
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
+
+####################################.
+#  START REFORMATTING THE DATA  ####
+####################################.
 
 ### Rename Columns in Raw Data
 names(df.wq) = c("SampleGroup",
@@ -217,10 +208,10 @@ names(df.wq) = c("SampleGroup",
                  "Description",
                  "TripNum",
                  "LabRecDate",
-                 "SampleDateTime",
+                 "DateTimeET",
                  "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
+                 "PrepOnET",
+                 "DateTimeAnalyzedET",
                  "AnalyzedBy",
                  "Analysis",
                  "ReportedName",
@@ -242,7 +233,7 @@ names(df.wq) = c("SampleGroup",
 df.wq <- df.wq[,-9]
 
 # Add in the timezone to the datetime format
-df.wq$SampleDateTime <- as.POSIXct(paste(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), tz = "America/New_York", usetz = T)
+df.wq$DateTimeET <- as.POSIXct(paste(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), tz = "America/New_York", usetz = T)
 
 # Fix other data types
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -266,17 +257,17 @@ df.wq$Location %<>%
   gsub("QUABBIN-","", .)
 
 
-######################
-#   Add new Columns  #
-######################
+#########################.
+#    Add new Columns  ####
+#########################.
 
 ### Unique ID number
 df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
-###########################
-#   Calculate Discharges  #
-###########################
+#############################.
+#   Calculate Discharges ####
+#############################.
 
 ratings <- dbReadTable(con, "tblRatings")
 ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$Current == TRUE], Parameter == "Staff Gauge Height")
@@ -294,7 +285,7 @@ if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
   print("No stage records available for discharge calculations")
 }
 
-###################################################
+###################################################.
 
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
@@ -321,12 +312,12 @@ if (length(dupes2) > 0){
 }
 rm(Uniq)
 
-### DataSource
-df.wq <- df.wq %>% mutate(DataSource = paste0("Field_Parameters_", min(as.Date(df.wq$SampleDateTime, format= "%y-%m-%d")),"_",max(as.Date(df.wq$SampleDateTime, format= "%y-%m-%d"))))
+### DataSource ####
+df.wq <- df.wq %>% mutate(DataSource = paste0("Field_Parameters_", min(as.Date(df.wq$DateTimeET, format= "%y-%m-%d")),"_",max(as.Date(df.wq$DateTimeET, format= "%y-%m-%d"))))
 
-### DataSourceID
+### DataSourceID ####
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -459,9 +450,9 @@ setFlagIDs <- function(){
 df.flags <- setFlagIDs()
 
 
-##################
-# Reformatting 2 #
-##################
+####################.
+# Reformatting 2 ####
+####################.
 
 # Deselect Columns that do not need in Database
 df.wq <- df.wq %>% select(-c(Description, FlagCode))
@@ -495,11 +486,11 @@ return(dfs)
             # df.wq     <- dfs[[1]]
             # path  <- dfs[[2]]
 
-##################################################
+##################################################.
 
-##########################
-# Write data to Database #
-##########################
+############################.
+# Write data to Database ####
+############################.
 
 IMPORT_DATA <- function(df.wq, df.flags=NULL , path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 
