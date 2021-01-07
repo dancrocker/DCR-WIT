@@ -42,7 +42,6 @@ PREP_DATA <- function(file){
   # Sys.getenv("PATH") # Rtools should be listed now
   ########################################################.
 
-
 # Extract the full data from the sheet
 data <- readxl::read_excel(file, sheet = "YSI_Import") %>% 
   select(-1)
@@ -106,9 +105,8 @@ df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
     
     ### Fix location names
     df$Location %<>%
-      gsub("M754","MD75.4")
-    x <- c("MD69", "MD70")
-    
+      gsub("M754","MD75.4",.)
+
     if (any(!unique(df$Location) %in% locations$LocationMWRA)) {
       stop("There is at least one location in this data that is not yet recorded in the database. Either remove the record or rename the location to MISC and add result to MISC sample table after import.")
     }
