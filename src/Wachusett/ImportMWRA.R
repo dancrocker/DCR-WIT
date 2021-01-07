@@ -123,7 +123,7 @@ if (nrow(df.wq) != length(paste0(df.wq$SampleDate, df.wq$Location,df.wq$Paramete
 ### Date and Time ####
 
 # Split the Sample time into date and time
-df.wq$SampleDate <- as.Date(df.wq$SampleDate)
+df.wq$SampleDate <- as_date(df.wq$SampleDate)
 #df.wq$SampleTime[is.na(df.wq$SampleTime)] <- paste(df.wq$SampleDate[is.na(df.wq$SampleTime)])
 
 df.wq <- separate(df.wq, SampleTime, into = c("date", "Time"), sep = " ")
@@ -158,9 +158,7 @@ df.wq$Location %<>%
   gsub("WACHUSET-","", .) %>%
   gsub("M754","MD75.4", .) %>% 
   gsub("BMP1","PRNW", .) %>%
-  gsub("BMP2","HLNW", .) %>%
-  gsub("QUABBINT-","", .) %>%
-  gsub("QUABBIN-","", .)
+  gsub("BMP2","HLNW", .) 
 
 ########################################################################.
 ###                           Add Unique ID                      ####
@@ -169,25 +167,6 @@ df.wq$Location %<>%
 ### Unique ID number ####
 df.wq$UniqueID <- NA_character_
 df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
-
-########################################################################.
-###                         Calculate Discharges                    ####
-########################################################################.
-
-ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings")) ### Dates get converted to UTC
-ToCalc <- filter(df.wq, Location %in% ratings$MWRA_Loc[ratings$IsCurrent == TRUE], Parameter == "Staff Gauge Height")
-if(nrow(ToCalc) > 0){ # If TRUE then there are discharges to be calculated
-  # call function in separate script to create df of discharges and df of flags to bind to main dfs
-  source(paste0(getwd(),"/src/Functions/calcDischarges.R"))
-  Q_dfs <- calcQ(userlocation = userlocation, filename.db = filename.db, stages = ToCalc)
-  # Extract the 2 dfs out of the list
-  df_Q <- Q_dfs$df_Q
-  df_QFlags <- Q_dfs$df_QFlags
-  df.wq <- bind_rows(df.wq,df_Q)
-  # Merge in Discharge Records
-} else {
-  print("No stage records available for discharge calculations")
-}
 
 ########################################################################.
 ###                           Check Duplicates                      ####
@@ -278,7 +257,7 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 df.wq$StormSampleN <- NA_character_
 
 ### Import date (Date) ####
-df.wq$ImportDate <- Sys.Date()
+df.wq$ImportDate <- Sys.Date() %>% force_tz("America/New_York")
 
 ########################################################################.
 ###                      REMOVE ANY PRELIMINARY DATA                ####
@@ -339,36 +318,13 @@ df.wq$ID <- setIDs()
 setFlagIDs <- function(){
   if(all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
   # Split the flags into a separate df and assign new ID
-  df.flags <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
+  df.flags <- as.data.frame(select(df.wq, c("ID","FlagCode"))) %>%
     rename("SampleID" = ID) %>%
     drop_na()
-  fc <- 1 # Flag Count
   } else {
     df.flags <- NA
-    fc <- 0
   }
-  ### Get discharge flags (if any) ####
-  #### Need to deal with condition where there are no regular flags in df.wq, but there are discharge flags
-  #### This part needs to go above the SET ID function 
-  
-  if(nrow(ToCalc) > 0){
-      if(!is.na(df_QFlags)){
-        df_QFlags <-  df_QFlags %>%
-          mutate(SampleID = df.wq$ID[match(df_QFlags$UNQID,df.wq$UniqueID)]) %>%
-          select(-UNQID)
-        fc <- fc + 2
-      }
-  }
-  if(fc == 1){
-    df.flags <- df.flags
-  } else {
-    if(fc == 3){
-      df.flags <- bind_rows(df.flags,df_QFlags)
-    } else {
-      df.flags <- NA
-    }
-  }
-      
+ 
   if(class(df.flags) == "data.frame"){
       query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
@@ -383,7 +339,7 @@ setFlagIDs <- function(){
     ### ID flags ###
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
       df.flags$DataTableName <- ImportTable
-      df.flags$DateFlagged <-  Sys.Date()
+      df.flags$DateFlagged <-  Sys.Date() %>% force_tz("America/New_York")
       df.flags$ImportStaff <-  username
       df.flags$Comment <- "Flag automatically added at import"
     
@@ -452,7 +408,9 @@ df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
 source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
-qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
+qc_message <- QCCHECK( df.qccheck = df.wq, 
+                       file = file, 
+                       ImportTable = ImportTable)
 print(qc_message)
 
 ### Create a list of the processed datasets ####
@@ -485,13 +443,13 @@ return(dfs)
 
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
-# df.flags is an optional argument
-
+  start <- now()
+  print(glue("Starting data import at {start}"))
   ### CONNECT TO DATABASE ####
   ### Set DB
   database <- filename.db
   schema <- 'Wachusett'
-  tz <- 'UTC'
+  tz <- 'America/New_York'
   ### Connect to Database 
   con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
@@ -512,7 +470,8 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
-  return("Import Successful")
+  end <- now()
+  return(print(glue("Import finished import at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END ####
 

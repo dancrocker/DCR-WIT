@@ -18,11 +18,11 @@
   # library(magrittr)
   # library(dataRetrieval)
 
-calcQ <- function(filename.db, stages, userlocation) {
+calcQ <- function(stages, userlocation) {
 # Set odbc connection  and get the rating table
 tz <- 'America/New_York'
 schema = userlocation
-con <- dbConnect(odbc::odbc(), filename.db, timezone = tz)
+con <- dbConnect(odbc::odbc(), "DCR_DWSP", timezone = tz)
 ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 
 # Disconnect from db and remove connection obj
@@ -34,15 +34,15 @@ ratings$DateTimeEndET[is.na(ratings$DateTimeEndET)] <- now
 # Pull stage records that need to get converted to discharge - use this df at the end of script to merge Q records with df_wq
 # stages <- ToCalc
 stages <- stages %>%
-  mutate(UniqueID = str_replace(stages$UniqueID,pattern = "_HT","_QCFS"))
+  mutate(UniqueID = str_replace(stages$UniqueID, pattern = "_HT","_QCFS"))
 HOBOcalc <- stages[!stages$Location %in% c("MD04","MD07","MD69"),] # NOT THE USGS GAUGES
 USGScalc <- stages[stages$Location %in% c("MD04","MD07","MD69"),]
 count <- 0
 if(nrow(HOBOcalc) > 0){
   count <- 1
     # Create a working df for HOBO discharges
-    df_Q <- select(HOBOcalc, c("Location","ResultReported","DateTimeET","UniqueID")) %>%
-      dplyr::rename( "Stage_ft" = ResultReported) %>%
+    df_Q <- select(HOBOcalc, c("Location","FinalResult","DateTimeET","UniqueID")) %>%
+      dplyr::rename( "Stage_ft" = FinalResult) %>%
       mutate(ratingNo = 0, part = 0, q_cfs = 0)
     
     df_Q$Stage_ft <- as.numeric(df_Q$Stage_ft)
@@ -160,20 +160,16 @@ if(nrow(HOBOcalc) > 0){
       ARC_Flags <- NULL
     }
     if(length(ARC_Flags) + length(BRC_Flags) > 0){
-        df_QFlags <- bind_rows(BRC_Flags,ARC_Flags)
+        df_QFlags <- bind_rows(BRC_Flags, ARC_Flags)
     } else {
       df_QFlags <- NA
     }
 
 df_HOBO <- HOBOcalc %>%
-  mutate(Analysis = "CALCULATED",
-         ReportedName = NA,
-         Parameter = "Discharge",
+  mutate(Parameter = "Discharge",
          Units = "cfs",
-         Status = NA,
-         Reportable = NA,
-         ResultReported = as.character(df_Q$q_cfs)
-         )
+         FinalResult = df_Q$q_cfs)
+         
 } else {
   df_QFlags <- NA 
 }
@@ -246,14 +242,9 @@ for (j in seq_along(qusgs$DateTimeET)) {
 qusgs$Discharge <- as.numeric(qusgs$Discharge)
 
 df_USGS <- USGScalc %>%
-  mutate(Analysis = "NWIS LOOKUP",
-         ReportedName = NA,
-         Parameter = "Discharge",
+  mutate(Parameter = "Discharge",
          Units = "cfs",
-         Status = NA,
-         Reportable = NA,
-         ResultReported = as.character(qusgs$Discharge)
-  )
+         FinalResult = qusgs$Discharge)
 } # End USGS Calcs
 
 # Combine HOBO and USGS Discharges depending on count value:

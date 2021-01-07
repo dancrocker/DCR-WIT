@@ -20,7 +20,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
   files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
   
   datadir <- config[1]
-  rds_files <- list.files(datadir, full.names = F ,pattern = ".rds")
+  rds_files <- list.files(datadir, full.names = F , pattern = ".rds")
   rds_in <- which(rds_files %in% files) %>% as.numeric()
   rds_files <- rds_files[rds_in]
   data <- lapply(paste0(datadir,"/", files), readRDS)

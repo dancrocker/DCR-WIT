@@ -60,16 +60,10 @@ MS <- config[5]
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
 
-# database <- 'DCR_DWSP'
-# tz <- 'America/New_York'
-# con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
+database <- 'DCR_DWSP'
+tz <- 'America/New_York'
+con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
   
-
-con2 <- dbConnect(odbc::odbc(),
-        .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-        paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"), timezone = "America/New_York")
-
-
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
@@ -86,8 +80,7 @@ if (userlocation == "Wachusett") {
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
 if (try(file.access(config[1], mode = 4)) == 0) {
-  # flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
-  flags <- dbReadTable(con2, "tblFlags") %>%
+  flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
     select(-3)
   flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
   
@@ -655,9 +648,9 @@ server <- function(input, output, session) {
   
   output$table.process.wq <- DT::renderDataTable({
     req(try(df.wq()))
-    if ("SampleDateTime" %in% names(df.wq())) {
+    if ("DateTimeET" %in% names(df.wq())) {
       datatable(df.wq()) %>%
-        formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
+        formatDate(columns = c("DateTimeET"), method = 'toLocaleString')
     } else {
       datatable(df.wq()) %>% 
         formatDate(columns = c("SampleDate"), method = 'toLocaleString')
