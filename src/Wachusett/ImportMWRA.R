@@ -277,7 +277,7 @@ if (nrow(query.prelim) > 0) {# If true there is at least one record in the time 
   qryDelete <- dbGetQuery(con,qryS) # Check the query to see if it returns any matches
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
   if(nrow(qryDelete) > 0) {
-    qryDeletePrelimData <- glue("DELETE * FROM [{schema}].[{ImporTable}] WHERE [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
+    qryDeletePrelimData <- glue("DELETE * FROM [{schema}].[{ImportTable}] WHERE [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
     rs <- dbSendStatement(con,qryDeletePrelimData)
     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
     dbClearResult(rs)
@@ -360,7 +360,7 @@ df.flags <- setFlagIDs()
 #Create empty dataframe
 unmatchedtimes <- df.wq[NULL,names(df.wq)]
 # Bring in tributary location IDs
-locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[{tblWatershedLocations}] WHERE [LocationType] ='Tributary'")))
+locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[tblWatershedLocations] WHERE [LocationType] ='Tributary'")))
 # Keep only locations of type "Tributary"
 df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
 rm(locations.tribs)
@@ -371,7 +371,7 @@ if(nrow(df.timecheck)>0){
   # Find earliest date in df.wq
   mindatecheck <- min(df.wq$DateTimeET)
   # Retrieve all date/times from database from earliest in df.wq to present - from Field Parameter table
-  databasetimes <- dbGetQuery(con, glue("SELECT [DateTimeET], [Location FROM] [{schema}].[{tblTribFieldParameters}] WHERE [DateTimeET] >= '{mindatecheck}'"))  
+  databasetimes <- dbGetQuery(con, glue("SELECT [DateTimeET], [Location] FROM [{schema}].[tblTribFieldParameters] WHERE [DateTimeET] >= '{mindatecheck}'"))  
     
   #Loop adds row for every record without matching location/date/time in database
   for (i in 1:nrow(df.timecheck)){
