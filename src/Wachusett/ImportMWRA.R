@@ -360,7 +360,7 @@ df.flags <- setFlagIDs()
 #Create empty dataframe
 unmatchedtimes <- df.wq[NULL,names(df.wq)]
 # Bring in tributary location IDs
-locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[{tblLocations}] WHERE [LocationType] ='Tributary'")))
+locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[{tblWatershedLocations}] WHERE [LocationType] ='Tributary'")))
 # Keep only locations of type "Tributary"
 df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
 rm(locations.tribs)
