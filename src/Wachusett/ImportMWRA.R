@@ -486,6 +486,10 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   ### Move the processed raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
+  if(!file.exists(processed_dir)) {
+    dir.create(processed_dir)
+  }
+    
   file.rename(path, paste0(processed_dir,"/", file))
   end <- now()
   return(print(glue("Import finished import at {end}, \n elapsed time {round(end - start)} seconds")))  
