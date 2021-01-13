@@ -137,6 +137,23 @@ df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
+if(all(!is.na(df.wq$LabRecDateET))) {
+  df.wq$LabRecDateET <- as.POSIXct(paste(df.wq$LabRecDateET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
+} else {
+  df.wq$LabRecDateET <- as_datetime(df.wq$LabRecDateET)
+}
+
+if(all(!is.na(df.wq$PrepOnET))) {
+  df.wq$PrepOnET <- as.POSIXct(paste(df.wq$PrepOnET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
+} else {
+  df.wq$PrepOnET <- as_datetime(df.wq$PrepOnET)
+}
+
+if(all(!is.na(df.wq$DateTimeAnalyzedET))) {
+  df.wq$DateTimeAnalyzedET <- as.POSIXct(paste(df.wq$DateTimeAnalyzedET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
+} else {
+  df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
+}
 ### Fix the Parameter names ####  - change from MWRA name to ParameterName
 params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]

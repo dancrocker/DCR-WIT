@@ -9,7 +9,7 @@
 ##############################################################################
 
 ###  Load required dplyr package
-library(dplyr)
+# library(dplyr)
 
 ### Function compares df.qccheck records (in the format at the end of WIT processing before importing) to historical min/max and percentiles
 
