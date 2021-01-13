@@ -606,7 +606,7 @@ server <- function(input, output, session) {
       #          control=list(smtpServer=MS))
     
       error=function(cond) {
-        message(paste("User cannot connect to SMTP Server, cannot send email", cond))
+        message(paste("There was an error trying to send the email", cond))
         return(1)
       },
       warning=function(cond) {
@@ -614,7 +614,7 @@ server <- function(input, output, session) {
         return(2)
       },
       finally={
-        message(paste("Email notification attempted"))
+        message(paste("Email notification attempt completed"))
       }
     )
     return(out)
@@ -688,7 +688,11 @@ server <- function(input, output, session) {
     req(input$flag)
     as.numeric(substr(input$flag, 1, 3))
     })
-
+  distro2 <- reactive({
+    req(dsflags())
+    as.character(dsflags()$EmailList[1])
+  })
+  
   flagComment <- reactive({
     req(input$FlagComment)
     paste0("Comment for flagged records: ", input$FlagComment)
@@ -879,11 +883,11 @@ server <- function(input, output, session) {
           #          control=list(smtpServer=MS))
         },
         error=function(cond) {
-          err <- print("User cannot connect to SMTP Server, cannot send email")
+          err <- print(paste("There was an error trying to send the email", err))
           return(err)
         },
         warning=function(cond) {
-          warn <- print("Send mail function caused a warning, but was completed successfully")
+          warn <- print(paste("Send mail function caused a warning, but was completed successfully", warn))
           return(warn)
         },
         finally={
@@ -891,7 +895,7 @@ server <- function(input, output, session) {
         }
       )
       return(out)
-    }
+  }
 
   ### IMPORT MESSAGE ####
   observeEvent(input$importFlags, {
