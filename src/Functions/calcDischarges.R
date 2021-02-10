@@ -139,7 +139,7 @@ if(nrow(HOBOcalc) > 0){
       # Use findq function to calculate discharge from each stage
       df_Q$q_cfs[i] <- findq(stage = df_Q$Stage_ft[i], C = get(C), a = get(a), n = get(n))
     }
-    df_Q$q_cfs <- round(df_Q$q_cfs, digits = 2)
+    df_Q$q_cfs <- round(df_Q$q_cfs, digits = 6)
     # Remove NULL values from BRC and ARC lists
     BRC_Flags[sapply(BRC_Flags, is.null)] <- NULL
     ARC_Flags[sapply(ARC_Flags, is.null)] <- NULL
