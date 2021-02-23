@@ -1,32 +1,33 @@
-##############################################################################################################################
-#     Title: ImportPhytoplankton.R
-#     Description: This script will Format/Process MWRA data to DCR
-#     Written by: Dan Crocker, Max Nyquist
-#     Last Update: April 2018
-#    This script will process and import Wachusett Phytoplankton data into the AB Database
-##############################################################################################################################
+###############################  HEADER  ######################################
+#  TITLE: ImportPhytoplankton.R
+#  DESCRIPTION: This script will Format/Process MWRA data to DCR
+#  AUTHOR(S): Dan Crocker, Max Nyquist
+#  DATE LAST UPDATED: 2021-02-23
+#  GIT REPO: 
+#  R version 3.6.0 (2019-04-26)  i386
+##############################################################################.
 
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed
-  # library(tidyverse)
-  # library(stringr)
-  # library(odbc)
-  # library(RODBC)
-  # library(DBI)
-  # library(lubridate)
-  # library(magrittr)
-  # library(readxl)
-  # library(magrittr)
-  # library(DescTools)
-  # library(devtools)
-  # library(tidyr)
+# library(tidyverse)
+# library(stringr)
+# library(odbc)
+# library(RODBC)
+# library(DBI)
+# library(lubridate)
+# library(magrittr)
+# library(readxl)
+# library(magrittr)
+# library(DescTools)
+# library(devtools)
+# library(tidyr)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
-######################################################################################################################
-######################################################################################################################
-######################################################################################################################
+########################################################################.
+###                          PROCESS DATA                           ####
+########################################################################.
 
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 
@@ -92,21 +93,22 @@ df.wq$count <- round(as.numeric(df.wq$count),3)
 # Drop unused levels from factor variables
 df.wq[, 2:8] <- droplevels(df.wq[, 2:8])
 
-# Fix factor vars that should be numeric
-df.wq$PA <- as.numeric(df.wq$PA)
+# Fix factor vars that should be numeric or integer
+df.wq$PA <- as.integer(df.wq$PA)
 df.wq$`Depth (m)` <- as.numeric(as.character(df.wq$`Depth (m)`))
-df.wq$Magnification <- as.numeric(as.character(df.wq$Magnification))
+df.wq$Magnification <- as.integer(as.character(df.wq$Magnification))
 
-### Add new columns ###
+### Add new columns ####
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
+database <- "DCR_DWSP"
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
+# 
 # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
-df_taxa_wach <- dbReadTable(con,"tbl_Taxa")
-unmatchedTaxa <- which(is.na(df_taxa_wach$ID[match(df.wq$taxa, df_taxa_wach$Name)]))
+df_taxa_wach <- dbReadTable(con, Id(schema = schema, table = "tbl_PhytoTaxa"))
+unmatchedTaxa <- which(is.na(df_taxa_wach$ID[match(df.wq$taxa, df_taxa_wach$Phyto_Name)]))
 
 if (length(unmatchedTaxa) > 0){
   # Exit function and send a warning to user
@@ -117,7 +119,7 @@ if (length(unmatchedTaxa) > 0){
 }
 # Unique ID number
 df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, df.wq$Date, df.wq$`Depth (m)`, df_taxa_wach$ID[match(df.wq$taxa, df_taxa_wach$Name)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Location, df.wq$Date, df.wq$`Depth (m)`, df_taxa_wach$ID[match(df.wq$taxa, df_taxa_wach$Phyto_Name)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -130,8 +132,8 @@ if (length(dupes) > 0){
              "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
 }
 
-### Make sure records are not already in DB
-Uniq <- dbGetQuery(con,paste0("SELECT UniqueID, ID FROM ", ImportTable))
+### Make sure records are not already in DB ####
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 
 if (nrow(dupes2) > 0){
@@ -146,7 +148,7 @@ rm(Uniq)
 ### DataSource
 df.wq <- df.wq %>% mutate(DataSource = paste(file, sheetName, sep = "_"))
 
-### DataSourceID
+### DataSourceID ####
 # Do some sorting first:
 df.wq <- df.wq[with(df.wq, order(Date, taxa, `Depth (m)`)),]
 
@@ -161,7 +163,7 @@ df.wq$ImportDate <- Sys.Date() %>% as.Date()
 # Read Tables
 # WQ
 setIDs <- function(){
-  query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+  query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
   # Get current max ID
   if(is.na(query.wq)) {
     query.wq <- 0
@@ -180,6 +182,12 @@ df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)]
 # Reorder remaining 30 columns to match the database table exactly
 cnames <- dbListFields(con, ImportTable)
 names(df.wq) <- cnames
+
+# change variable types to match database
+df.wq$ID <- as.integer(df.wq$ID)
+df.wq$DataSourceID <- as.integer(df.wq$DataSourceID)
+df.wq$SampleDate <- as.Date(df.wq$SampleDate)
+
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
@@ -190,10 +198,10 @@ dfs[[3]] <- NULL # Removed condition to test for flags and put it in the setFlag
 dbDisconnect(con)
 rm(con)
 return(dfs)
-} # END FUNCTION
+} # END FUNCTION ####
 
 #### COMMENT OUT SECTION BELOW WHEN RUNNING SHINY
-########################################################################################################
+########################################################################################################.
 # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, ImportTable = ImportTable, ImportFlagTable = NULL )
 # #
@@ -202,24 +210,26 @@ return(dfs)
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
 
-########################################################################################################
 
-##########################
-# Write data to Database #
-##########################
+########################################################################.
+###                       Write data to Database                    ####
+########################################################################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   # df.flags is an optional argument  - not used for this dataset
 
 # Establish db connection
-con <-  odbcConnectAccess(filename.db)
+con <-  dbConnect(odbc::odbc(), database, timezone = tz)
 # Get Import Table Columns
-ColumnsOfTable <- sqlColumns(con, ImportTable)
+ColumnsOfTable <- dbListFields(con, ImportTable)
 
-# Set variable types
-varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+# # Set variable types -- not necessary because specified above?
+# varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
+# sqlSave(con, df.wq, tablename = ImportTable, append = T,
+#           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+
+# Import the data to the database
+odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
 # Disconnect from db and remove connection obj
 odbcCloseAll()
