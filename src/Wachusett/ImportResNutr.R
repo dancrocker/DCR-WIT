@@ -1,30 +1,31 @@
-##############################################################################################################################
-#     Title: FormatMWRA.R
-#     Description: This script will Format/Process MWRA data to DCR
-#     Written by: Nick Zinck/Dan Crocker, October, 2017
-#
-#    This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
+###############################  HEADER  ######################################
+#  TITLE: FormatMWRA.R
+#  DESCRIPTION: This script will Format/Process MWRA data to DCR
+#  AUTHOR(S): Nick Zinck/Dan Crocker, October, 2017
+#  DATE LAST UPDATED: 2021-02-22 (update for sql server)
+#  This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
 #     - As of 10/23/17 testing results positive for WATTRB/WATTRN
 #     - Edits to script will likely be needed after testing other project data
 #     - Additional variables may need to be generated to interact with shiny App
-##############################################################################################################################
+#  GIT REPO: 
+#  R version 3.6.0 (2019-04-26)  i386
+##############################################################################.
 
 # Load libraries needed
 
-library(stringr)
-library(odbc)
-library(RODBC)
-library(DBI)
-library(lubridate)
-library(magrittr)
+# library(stringr)
+# library(odbc)
+# library(RODBC)
+# library(DBI)
+# library(lubridate)
+# library(magrittr)
 # Tidyverse and readxl are loaded in App.r
 
 # COMMENT OUT ABOVE CODE EXCEPT FOR LOADING LIBRARIES WHEN RUNNING IN SHINY
 
-#############################
-#   PROCESSING FUNCTION    #
-############################
-
+########################################################################.
+####                 PROCESSING FUNCTION                            ####
+########################################################################.
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
 # Get the full path to the file
@@ -71,14 +72,10 @@ database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
 con <- dbConnect(odbc::odbc(), database, timezone = tz)
-# con <- dbConnect(odbc::odbc(),
-#                  .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-#                                             paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-#                  timezone = "America/New_York")
 
-#################################
-#  START REFORMATTING THE DATA  #
-#################################
+########################################################################.
+###                     START REFORMATTING THE DATA                 ####
+########################################################################.
 
 ### Rename Columns in Raw Data
 names(df.wq) = c("SampleGroup",
@@ -148,10 +145,9 @@ df.wq$Location %<>%
   gsub("FIELD-QC-","", .)
 
 
-######################
-#   Add new Columns  #
-######################
-
+########################################################################.
+###                            Add new Columns                      ####
+########################################################################.
 ### Unique ID number
 df.wq$UniqueID <- ""
 df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
@@ -246,10 +242,9 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 ### Importdate (Date)
 df.wq$ImportDate <- today()
 
-#####################################################################
-
-### IDs
-
+########################################################################.
+###                            Set IDs                              ####
+########################################################################.
 
 # Read Tables
 # WQ
@@ -303,9 +298,10 @@ setFlagIDs <- function(){
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
-##############################################################################################################################
-# Reformatting 2
-##############################################################################################################################
+
+########################################################################.
+###                          Reformatting 2                         ####
+########################################################################.
 
 ### Deselect Columns that do not need in Database
 df.wq <- df.wq %>% select(-c(Description,
@@ -333,7 +329,7 @@ return(dfs)
 } # END FUNCTION
 
 #### COMMENT OUT WHEN RUNNING SHINY
-########################################################################################################
+########################################################################################################.
 #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db)
 #
@@ -342,11 +338,9 @@ return(dfs)
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
 
-########################################################################################################
-
-##########################
-# Write data to Database #
-##########################
+########################################################################.
+###                    Write data to Database                       ####
+########################################################################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
 
@@ -354,20 +348,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
 
-  # WQ Data
-  # ColumnsOfTable <- sqlColumns(con, ImportTable)
-  # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  # sqlSave(con, df.wq, tablename = ImportTable, append = T,
-  #         rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
   
-  # # Flag data
-  #  if (!is.na(df.flags)){ # Check and make sure there is flag data to import
-  #   sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-  #           rownames = F, colnames = F, addPK = F , fast = F)
-  # }
-  ### Flag data ####
+   ### Flag data ####
   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
   } else {
