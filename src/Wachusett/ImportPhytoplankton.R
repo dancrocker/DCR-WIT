@@ -232,7 +232,7 @@ ColumnsOfTable <- dbListFields(con, ImportTable)
 odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
 # Disconnect from db and remove connection obj
-odbcCloseAll()
+dbDisconnect(con)
 rm(con)
 
   return("Import Successful")
