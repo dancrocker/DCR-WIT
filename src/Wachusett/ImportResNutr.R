@@ -1,13 +1,15 @@
-##############################################################################################################################
-#     Title: FormatMWRA.R
-#     Description: This script will Format/Process MWRA data to DCR
-#     Written by: Nick Zinck/Dan Crocker, October, 2017
-#
-#    This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
+###############################  HEADER  ######################################
+#  TITLE: FormatMWRA.R
+#  DESCRIPTION: This script will Format/Process MWRA data to DCR
+#  AUTHOR(S): Nick Zinck/Dan Crocker, October, 2017
+#  DATE LAST UPDATED: 2021-02-22 (update for sql server)
+#  This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
 #     - As of 10/23/17 testing results positive for WATTRB/WATTRN
 #     - Edits to script will likely be needed after testing other project data
 #     - Additional variables may need to be generated to interact with shiny App
-##############################################################################################################################
+#  GIT REPO: 
+#  R version 3.6.0 (2019-04-26)  i386
+##############################################################################.
 
 # Load libraries needed
 
@@ -21,10 +23,9 @@
 
 # COMMENT OUT ABOVE CODE EXCEPT FOR LOADING LIBRARIES WHEN RUNNING IN SHINY
 
-#############################
-#   PROCESSING FUNCTION    #
-############################
-
+########################################################################.
+####                 PROCESSING FUNCTION                            ####
+########################################################################.
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
 # Get the full path to the file
@@ -67,14 +68,14 @@ if (length(which(str_detect(df.wq$Location, "GENERAL-GEN"),TRUE)) > 0) {
 
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
+database <- "DCR_DWSP"
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
-#################################
-#  START REFORMATTING THE DATA  #
-#################################
+########################################################################.
+###                     START REFORMATTING THE DATA                 ####
+########################################################################.
 
 ### Rename Columns in Raw Data
 names(df.wq) = c("SampleGroup",
@@ -83,11 +84,11 @@ names(df.wq) = c("SampleGroup",
                  "Location",
                  "Description",
                  "TripNum",
-                 "LabRecDate",
+                 "LabRecDateET",
                  "SampleDate",
                  "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
+                 "PrepOnET",
+                 "DateTimeAnalyzedET",
                  "AnalyzedBy",
                  "Analysis",
                  "ReportedName",
@@ -113,18 +114,23 @@ df.wq$SampleDate <- as.Date(df.wq$SampleDate)
 df.wq <- separate(df.wq, SampleTime, into = c("date", "Time"), sep = " ")
 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 # Fix other data types
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
+df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
+df.wq$SampleNumber <- as.character(df.wq$SampleNumber)
+df.wq$PrepOnET <- as.POSIXct(df.wq$PrepOnET) # note - this col does not contain any data and could be removed
 
 # Recode Staff Gauge Depth to Water Depth 
 df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+dbListTables(con, schema_name = schema)
+
+params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
@@ -139,13 +145,12 @@ df.wq$Location %<>%
   gsub("FIELD-QC-","", .)
 
 
-######################
-#   Add new Columns  #
-######################
-
+########################################################################.
+###                            Add new Columns                      ####
+########################################################################.
 ### Unique ID number
 df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -158,11 +163,16 @@ if (length(dupes) > 0){
   #print(dupes) # Show the duplicate Unique IDs to user in Shiny
 }
 ### Make sure records are not already in DB
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+# flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
+dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
+# dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
-Uniq <- dbGetQuery(con,paste0("SELECT UniqueID, ID FROM ", ImportTable))
-dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
 
-if (length(dupes2) > 0){
+# Uniq <- dbGetQuery(con,paste0("SELECT UniqueID, ID FROM ", ImportTable))
+# dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
+
+if (nrow(dupes2) > 0){
   # Exit function and send a warning to user
   stop(paste0("This data file contains ", length(dupes2),
               " records that appear to already exist in the database! Eliminate all duplicates before proceeding"))
@@ -175,10 +185,11 @@ df.wq <- df.wq %>% mutate(DataSource = paste0("MWRA_", file))
 
 ### DataSourceID
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
-df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
+df.wq$DataSourceID <- as.numeric(seq(1, nrow(df.wq), 1))
+
 
 # note: some reported results are "A" for (DEP). These will be NA in the ResultFinal Columns
 # ResultReported -
@@ -226,20 +237,20 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
   # df.wq$StormSample <- 0 %>%  as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.numeric
+# df.wq$StormSampleN <- NA %>% as.numeric
 
 ### Importdate (Date)
 df.wq$ImportDate <- today()
 
-#####################################################################
-
-### IDs
-
+########################################################################.
+###                            Set IDs                              ####
+########################################################################.
 
 # Read Tables
 # WQ
 setIDs <- function(){
-  query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+  query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
+  # query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
   # Get current max ID
   if(is.na(query.wq)) {
     query.wq <- 0
@@ -252,13 +263,13 @@ setIDs <- function(){
   ### ID wq
   df.wq$ID <- seq.int(nrow(df.wq)) + ID.max.wq
 }
-df.wq$ID <- setIDs()
+df.wq$ID <- as.integer(setIDs())
 
 # Flags
 # First make sure there are flags in the dataset
 setFlagIDs <- function(){
   if (all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
-    query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
+    query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
     # Get current max ID
     if(is.na(query.flags)) {
       query.flags <- 0
@@ -287,9 +298,10 @@ setFlagIDs <- function(){
   } # End flags processing chunk
 } # End set flags function
 df.flags <- setFlagIDs()
-##############################################################################################################################
-# Reformatting 2
-##############################################################################################################################
+
+########################################################################.
+###                          Reformatting 2                         ####
+########################################################################.
 
 ### Deselect Columns that do not need in Database
 df.wq <- df.wq %>% select(-c(Description,
@@ -317,7 +329,7 @@ return(dfs)
 } # END FUNCTION
 
 #### COMMENT OUT WHEN RUNNING SHINY
-########################################################################################################
+########################################################################################################.
 #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db)
 #
@@ -326,28 +338,23 @@ return(dfs)
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
 
-########################################################################################################
-
-##########################
-# Write data to Database #
-##########################
+########################################################################.
+###                    Write data to Database                       ####
+########################################################################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
 
-  con <-  odbcConnectAccess(filename.db)
+  con <-  dbConnect(odbc::odbc(), database, timezone = tz)
 
   # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
 
-  # WQ Data
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-  # Flag data
-   if (!is.na(df.flags)){ # Check and make sure there is flag data to import
-    sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F)
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+  
+   ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+  } else {
+    print("There were no flags to import")
   }
 
   # Disconnect from db and remove connection obj
@@ -355,7 +362,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   rm(con)
 
   #Move the processed raw data file to the processed folder
-  processed_subdir <- paste0("/", max(year(df.wq$SampleDateTime))) # Raw data archived by year, subfolders = Year
+  processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
 
