@@ -29,8 +29,7 @@ ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 dbDisconnect(con)
 rm(con)
 # Assigntoday's date as the end date for ratings that are still valid - so that date test won't compare against NA values
-now <- format(Sys.time(), "%Y-%m-%d")
-ratings$DateTimeEndET[is.na(ratings$DateTimeEndET)] <- now
+ratings$DateTimeEndET[is.na(ratings$DateTimeEndET)] <- Sys.time()
 # Pull stage records that need to get converted to discharge - use this df at the end of script to merge Q records with df_wq
 # stages <- ToCalc
 stages <- stages %>%
