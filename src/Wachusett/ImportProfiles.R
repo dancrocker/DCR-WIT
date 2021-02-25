@@ -64,8 +64,8 @@ df.wq <- separate(df.wq, Time, into = c("Date2", "Time"), sep = " ")
 # reformat the Wachusett Profile data to "Tidy" data format ("Long" instead of "Wide")
 df.wq <- gather(df.wq, Parameter, Result, c(7:16))
 
-# SampleDateTime
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$Date, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+# DateTimeET
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$Date, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 #Get rid of UserID, Date,Time and Secchi
 df.wq <- df.wq[, c(4,12, 10, 7, 11, 5)]
@@ -76,7 +76,7 @@ df.wq$DEP <- round(as.numeric(df.wq$DEP),3)
 # Connect to database
 database <- "DCR_DWSP"
 schema <- "Wachusett"
-tz <- 'America/New_York'
+tz <- 'UTC'
 con <- dbConnect(odbc::odbc(), database, timezone = tz)
 
 probes <- dbReadTable(con, Id(schema = schema, table = "tbl_Equipment"))
@@ -86,7 +86,7 @@ df.wq$`Unit ID` <- probe
 
 # UniqueID
 df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Site, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), df.wq$DEP, df.wq$Parameter, probes$EquipNum[match(df.wq$`Unit ID`, probes$EquipName)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Site, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), df.wq$DEP, df.wq$Parameter, probes$EquipNum[match(df.wq$`Unit ID`, probes$EquipName)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -116,7 +116,7 @@ df.wq <- df.wq %>% mutate(DataSource = paste(file, sheetName, sep = "_"))
 
 ### DataSourceID
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Site)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Site)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -158,6 +158,10 @@ names(df.wq) <- cnames
 # change variable types to match database
 df.wq$ID <- as.integer(df.wq$ID)
 df.wq$DataSourceID <- as.integer(df.wq$DataSourceID)
+
+# Change time to UTC in DateTimeET
+df.wq$DateTimeET <- format(df.wq$DateTimeET, tz = "America/New_York", usetz = TRUE) %>%
+  lubridate::as_datetime()
 
 # Create a list of the processed datasets
 dfs <- list()
@@ -205,5 +209,5 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 ### END
 
-# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-#             ImportTable = ImportTable, ImportFlagTable = NULL)
+IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+            ImportTable = ImportTable, ImportFlagTable = NULL)
