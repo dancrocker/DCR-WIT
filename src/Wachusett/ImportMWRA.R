@@ -420,7 +420,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 30 columns to match the database table exactly ####
-col.order.wq <- dbListFields(con, ImportTable)
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
