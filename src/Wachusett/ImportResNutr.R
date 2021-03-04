@@ -313,7 +313,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 32 columns to match the database table exactly
-col.order.wq <- dbListFields(con, ImportTable)
+col.order.wq <- dbListFields(con, schema_name = schema, ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 # Create a list of the processed datasets
