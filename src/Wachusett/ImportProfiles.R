@@ -1,10 +1,13 @@
-##############################################################################################################################
-#     Title: ImportProfiles.R
-#     Description: This script will process/import reservoir Profile Data to database
-#     Written by: Dan Crocker, Max Nyquist
-#     Last Update: April 2018
-#
-##############################################################################################################################
+###############################  HEADER  ######################################
+#  TITLE: ImportProfiles.R
+#  DESCRIPTION: This script will process/import reservoir Profile Data to database
+#  AUTHOR(S): Dan Crocker, Max Nyquist
+#  DATE LAST UPDATED: 2021-02-23
+#  GIT REPO: 
+#  R version 3.6.0 (2019-04-26)  i386
+##############################################################################.
+
+# COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # library(tidyverse)
 # library(stringr)
@@ -16,7 +19,12 @@
 # library(readxl)
 # library(DescTools)
 
-###############################################################################################
+# COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
+
+########################################################################.
+###                          Process Data                           ####
+########################################################################.
+
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 
 # Eliminate Scientific notation in numerical fields
@@ -56,8 +64,8 @@ df.wq <- separate(df.wq, Time, into = c("Date2", "Time"), sep = " ")
 # reformat the Wachusett Profile data to "Tidy" data format ("Long" instead of "Wide")
 df.wq <- gather(df.wq, Parameter, Result, c(7:16))
 
-# SampleDateTime
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$Date, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+# DateTimeET
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$Date, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 #Get rid of UserID, Date,Time and Secchi
 df.wq <- df.wq[, c(4,12, 10, 7, 11, 5)]
@@ -65,18 +73,20 @@ df.wq <- df.wq[, c(4,12, 10, 7, 11, 5)]
 df.wq$Result <- round(as.numeric(df.wq$Result), 3)
 df.wq$DEP <- round(as.numeric(df.wq$DEP),3)
 
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
-probes <- dbReadTable(con,"tbl_Equipment")
-df_param <- dbReadTable(con,"tblParameters")
+# Connect to database
+database <- "DCR_DWSP"
+schema <- "Wachusett"
+tz <- 'UTC'
+con <- dbConnect(odbc::odbc(), database, timezone = tz)
+
+probes <- dbReadTable(con, Id(schema = schema, table = "tbl_Equipment"))
+df_param <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 
 df.wq$`Unit ID` <- probe
 
 # UniqueID
 df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Site, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), df.wq$DEP, df.wq$Parameter, probes$EquipNum[match(df.wq$`Unit ID`, probes$EquipName)], sep = "_")
+df.wq$UniqueID <- paste(df.wq$Site, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), df.wq$DEP, df.wq$Parameter, probes$EquipNum[match(df.wq$`Unit ID`, probes$EquipName)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -89,7 +99,7 @@ if (length(dupes) > 0){
              "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
 }
 
-Uniq <- dbGetQuery(con,paste0("SELECT UniqueID, ID FROM ", ImportTable))
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 
 if (nrow(dupes2) > 0){
@@ -101,16 +111,12 @@ if (nrow(dupes2) > 0){
 }
 rm(Uniq)
 
-###############################################################################################
-
-###############################################################################################
-
 ### DataSource
 df.wq <- df.wq %>% mutate(DataSource = paste(file, sheetName, sep = "_"))
 
 ### DataSourceID
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Site)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Site)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -122,7 +128,7 @@ df.wq$ImportDate <- today()
 # Read Tables
 # WQ
 setIDs <- function(){
-  query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+  query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
   # Get current max ID
   if(is.na(query.wq)) {
     query.wq <- 0
@@ -149,6 +155,14 @@ cnames <- dbListFields(con, ImportTable)
 #list(cnames)
 names(df.wq) <- cnames
 
+# change variable types to match database
+df.wq$ID <- as.integer(df.wq$ID)
+df.wq$DataSourceID <- as.integer(df.wq$DataSourceID)
+
+# Change time to UTC in DateTimeET
+df.wq$DateTimeET <- format(df.wq$DateTimeET, tz = "America/New_York", usetz = TRUE) %>%
+  lubridate::as_datetime()
+
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
@@ -168,32 +182,32 @@ return(dfs)
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
 
-########################################################################################################
-
-##########################
-# Write data to Database #
-##########################
+########################################################################.
+###                       Write Data to Database                    ####
+########################################################################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   # df.flags is an optional argument  - not used for this dataset
 
   # Establish db connection
-  con <-  odbcConnectAccess(filename.db)
+  con <-  dbConnect(odbc::odbc(), database, timezone = tz)
   # Get Import Table Columns
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
+  ColumnsOfTable <- dbListFields(con, ImportTable)
 
-  # Set variable types
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
+  # # Set variable types
+  # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
+  # sqlSave(con, df.wq, tablename = ImportTable, append = T,
+  #         rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+  
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+  
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   return("Import Successful")
 }
 ### END
 
-# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-#             ImportTable = ImportTable, ImportFlagTable = NULL)
+IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+            ImportTable = ImportTable, ImportFlagTable = NULL)
