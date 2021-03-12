@@ -151,7 +151,7 @@ df.wq$Units <- df_param$ParameterUnits[match(df.wq$Parameter, df_param$Parameter
 df.wq <- df.wq[, c(11, 1:5, 12, 6:10)]
 
 # Get column names from db table
-cnames <- dbListFields(con, ImportTable)
+cnames <- dbListFields(con, schema = schema, ImportTable)
 #list(cnames)
 names(df.wq) <- cnames
 
@@ -192,7 +192,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   # Establish db connection
   con <-  dbConnect(odbc::odbc(), database, timezone = tz)
   # Get Import Table Columns
-  ColumnsOfTable <- dbListFields(con, ImportTable)
+  ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
 
   # # Set variable types
   # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
