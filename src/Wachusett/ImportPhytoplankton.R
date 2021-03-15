@@ -180,7 +180,7 @@ df.wq$ID <- setIDs()
 
 df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)]
 # Reorder remaining 30 columns to match the database table exactly
-cnames <- dbListFields(con, ImportTable)
+cnames <- dbListFields(con, schema = schema, ImportTable)
 names(df.wq) <- cnames
 
 # change variable types to match database
@@ -221,7 +221,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 # Establish db connection
 con <-  dbConnect(odbc::odbc(), database, timezone = tz)
 # Get Import Table Columns
-ColumnsOfTable <- dbListFields(con, ImportTable)
+ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
 
 # # Set variable types -- not necessary because specified above?
 # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
