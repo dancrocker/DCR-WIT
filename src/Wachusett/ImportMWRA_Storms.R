@@ -78,7 +78,7 @@ df.wq <- df.wq[,c(1:26)]
 database <- filename.db
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -193,7 +193,7 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 
 ### Connect in UTC timezone, times come back in local timezone
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
 
 locs <- df.wq$Location %>% unique()
 
@@ -252,16 +252,14 @@ hobo_rec <- hobo_rec %>%
 ########################################################################.
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
+tz <- 'UTC'
+con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
 # Below 2 lines same as above (can be deleted)
 # locs <- df.wq$Location %>% unique()
 # times <- df.wq$DateTimeET %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
 
 ### Pull hobo recs with matching timestamps
-qry_fp_rec <- paste0("SELECT * FROM tblStormFieldParameters WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
+qry_fp_rec <- paste0("SELECT * FROM [Wachusett].[tblStormFieldParameters] WHERE [Location] IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
 fp_rec <- dbGetQuery(con, qry_fp_rec)
 
 if(any(!times %in% unique(fp_rec$DateTimeUTC))) {
@@ -341,9 +339,8 @@ if (length(dupes) > 0){
              "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
 }
 ### Make sure records are not already in DB ####
-
-Uniq <- dbGetQuery(con, paste0("SELECT UniqueID, ID FROM ", ImportTable))
-flags <- dbGetQuery(con, paste0("SELECT SampleID, FlagCode FROM ", ImportFlagTable," WHERE FlagCode = 102"))
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlayTable}] WHERE FlagCode = 102"))
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
@@ -390,7 +387,7 @@ df.wq$ImportDate <- Sys.Date()
 # Read Tables
 # WQ
 setIDs <- function(){
-query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
 # Get current max ID
 if(is.na(query.wq)) {
   query.wq <- 0
@@ -445,16 +442,16 @@ setFlagIDs <- function(){
   }
       
   if(class(df.flags) == "data.frame"){
-      query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
-      # Get current max ID
-      if(is.na(query.flags)) {
-        query.flags <- 0
-      } else {
-        query.flags <- query.flags
-      }
-      ID.max.flags <- as.numeric(unlist(query.flags))
-      rm(query.flags)
-      
+    query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
+    # Get current max ID
+    if(is.na(query.flags)) {
+      query.flags <- 0
+    } else {
+      query.flags <- query.flags
+    }
+    ID.max.flags <- as.numeric(unlist(query.flags))
+    rm(query.flags)
+    
       
       ### ID flags
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
@@ -518,7 +515,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 30 columns to match the database table exactly
-col.order.wq <- dbListFields(con, ImportTable)
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 # QC Test

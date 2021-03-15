@@ -27,10 +27,10 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords, comme
 ### Connect to DB - need temporary logic to choose Access vs SQL Server  
   flag <- as.numeric(flag)
   
-  database <- 'DCR_DWSP'
+  database <- flag.db
   schema <- userlocation
   tz <- 'UTC'
-  con <- dbConnect(odbc::odbc(), database, timezone = tz)
+  con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
   # Get current maximum record ID from the data table
   maxSampleID <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{datatable}]"))
   maxSampleID <- as.numeric(unlist(maxSampleID))
@@ -66,15 +66,18 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords, comme
 # df.manualflags <- PROCESS_DATA(flag.db, datatable, flagtable, flag, flagRecords, comment, usertype, userlocation)
 
 IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags, usertype, userlocation){
-
-    database <- 'DCR_DWSP'
+    start <- now()
+    print(glue("Starting data import at {start}"))
+    
+    database <- flag.db
     schema <- userlocation
     tz <- 'UTC'
-    con <- dbConnect(odbc::odbc(), database, timezone = tz)
+    con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{flagtable}")), value = df.manualflags, append = TRUE)
     dbDisconnect(con)
     rm(con)
-  
-  return("Import Successful")
+    
+    end <- now()
+    return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 # IMPORT_DATA(flag.db = flag.db, flagtable = flagtable, df.manualflags = df.manualflags)

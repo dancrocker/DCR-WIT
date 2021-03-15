@@ -29,9 +29,9 @@ ipak <- function(pkg){
   sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi", "RDCOMClient")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -39,9 +39,6 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
 
 # Load-Install Packages
 ipak(packages)
-
-library(RDCOMClient)
- 
 
 source("src/Functions/outlook_email.R", local = T)
 
@@ -60,10 +57,10 @@ MS <- config[5]
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
 
-database <- 'DCR_DWSP'
+database <- 'DCR_DWSP_App_R'
 tz <- 'America/New_York'
-con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
-  
+con2 <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
