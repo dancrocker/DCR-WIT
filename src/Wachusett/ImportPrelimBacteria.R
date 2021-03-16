@@ -158,9 +158,6 @@ con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timez
 #  START REFORMATTING THE DATA  #
 #################################
 
-### Date and Time:
-df.wq$SampleDate <- as_date(df.wq$SampleDate)
-
 # Merge the actual date column with the new Time Column and reformat to POSIXct
 df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
