@@ -80,8 +80,7 @@ flagdatasets <- filter(datasets, !is.na(FlagTable))
 if (try(file.access(config[1], mode = 4)) == 0) {
   flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
     select(-3)
-  flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
-  
+} else {
   ### Get df Flags from Dropbox rds files
   df_flags_url <- config[30]
   datadir <- paste0(getwd(), "/rds_files")
@@ -90,6 +89,8 @@ if (try(file.access(config[1], mode = 4)) == 0) {
       write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
   flags <- read_rds(paste0(datadir, "/df_flags.rds"))
 }
+
+flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
 
 ### Get df Paramaeters from Dropbox rds files
 # df_wach_params_url <- config[31]
