@@ -57,9 +57,10 @@ MS <- config[5]
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
 
-database <- 'DCR_DWSP_App_R'
+dsn <- 'DCR_DWSP_App_R'
+database <- "DCR_DWSP"
 tz <- 'America/New_York'
-con2 <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
@@ -649,8 +650,7 @@ server <- function(input, output, session) {
       datatable(df.wq()) %>%
         formatDate(columns = c("DateTimeET"), method = 'toLocaleString')
     } else {
-      datatable(df.wq()) %>% 
-        formatDate(columns = c("SampleDate"), method = 'toLocaleString')
+      datatable(df.wq()) 
     }
   })
 
@@ -693,7 +693,6 @@ server <- function(input, output, session) {
   flagComment <- reactive({
     req(input$FlagComment)
     paste0("Comment for flagged records: ", input$FlagComment)
-
   })
   
   rds_updates2 <- reactive({
@@ -797,7 +796,7 @@ server <- function(input, output, session) {
    ### PROCESS FLAGS BUTTON ####
   df.manualflags <- eventReactive(input$processflags, {
     showModal(busyModal(msg = "Processing flags..."))
-    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
+    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), 
                                    flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords(), 
                                    comment = flagComment(), usertype = usertype, userlocation = userlocation)

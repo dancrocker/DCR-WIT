@@ -27,10 +27,11 @@ PROCESS_DATA <- function(flag.db, datatable, flagtable, flag, flagRecords, comme
 ### Connect to DB - need temporary logic to choose Access vs SQL Server  
   flag <- as.numeric(flag)
   
-  database <- flag.db
+  dsn <- flag.db
+  database <- "DCR_DWSP"
   schema <- userlocation
   tz <- 'UTC'
-  con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
   # Get current maximum record ID from the data table
   maxSampleID <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{datatable}]"))
   maxSampleID <- as.numeric(unlist(maxSampleID))
@@ -69,10 +70,11 @@ IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags
     start <- now()
     print(glue("Starting data import at {start}"))
     
-    database <- flag.db
+    dsn <- flag.db
+    database <- "DCR_DWSP"
     schema <- userlocation
     tz <- 'UTC'
-    con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{flagtable}")), value = df.manualflags, append = TRUE)
     dbDisconnect(con)
     rm(con)

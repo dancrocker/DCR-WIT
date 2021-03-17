@@ -75,10 +75,11 @@ df.wq <- df.wq[,c(1:26)]
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
 ### Connect to Database   
-database <- filename.db
+dsn <- filename.db
+database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -193,7 +194,7 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 
 ### Connect in UTC timezone, times come back in local timezone
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 locs <- df.wq$Location %>% unique()
 
@@ -553,26 +554,26 @@ return(dfs)
 ##########################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
-# df.flags is an optional argument
+  start <- now()
+  print(glue("Starting data import at {start}"))
+  ### Connect to Database   
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- "Wachusett"
+  tz <- 'America/New_York'
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
 
-  con <-  odbcConnectAccess(filename.db)
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
-  # WQ Data ####
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-  # Flag data ####
-   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
-   } else {
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+  } else {
     print("There were no flags to import")
   }
 
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   ### Move the processed raw data file to the processed folder ####
@@ -580,7 +581,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   dir.create(processed_subdir)
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
-  return("Import Successful")
+  
+  end <- now()
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END ####
 

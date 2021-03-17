@@ -84,9 +84,11 @@ df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
 # Round times ####
 
     ### Connect to Database   
-    database <- "DCR_DWSP_App_R"
+    dsn <- "DCR_DWSP_App_R"
+    database <- "DCR_DWSP"
+    schema <- 'Wachusett'
     tz <- 'America/New_York'
-    con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
     locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
     flowlocations <- filter(locations, !is.na(LocationFlow))
@@ -151,15 +153,17 @@ path <- paste0(rawdatafolder,"/", file)
 df <- PREP_DATA(file = path)
 
 # Connect to db for queries below
-database <- filename.db
+dsn <- filename.db
+database <- "DCR_DWSP"
+schema <- 'Wachusett'
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ### Add missing columns ####
 # Get columns from table in db
 cols <- dbListFields(con, schema_name = schema, name = "tblTribFieldParameters")
 # Load tblParameters to access abbreviation for Unique ID
-params <- dbReadTable(con,Id(schema = schema, table = "tblParameters"))
+params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 
 # Add the ones that are missing
 for (col in cols) {
@@ -389,10 +393,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   start <- now()
   print(glue("Starting data import at {start}"))
   # Import the data to the database
-  database <- filename.db
+  dsn <- filename.db
+  database <- "DCR_DWSP"
   schema <- "Wachusett"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
