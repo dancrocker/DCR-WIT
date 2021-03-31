@@ -20,10 +20,12 @@
 
 calcQ <- function(stages, userlocation) {
 # Set odbc connection  and get the rating table
+dsn <- "DCR_DWSP_App_R"
+database <- "DCR_DWSP"
+schema <- "Wachusett"
 tz <- 'America/New_York'
-schema = userlocation
-con <- dbConnect(odbc::odbc(), "DCR_DWSP", timezone = tz)
-ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  
+  ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
