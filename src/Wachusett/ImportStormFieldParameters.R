@@ -148,24 +148,28 @@ return(dfs)
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   
-  con <-  odbcConnectAccess(filename.db)
+  start <- now()
+  print(glue("Starting data import at {start}"))
+  ### CONNECT TO DATABASE ####
+  ### Set DB
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  ### Connect to Database 
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
   
-  ### WQ Data ####
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
   
   ### Flag data ####
   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
   } else {
     print("There were no flags to import")
   }
   
-  ### Disconnect from db and remove connection obj
-  odbcCloseAll()
+  # Disconnect from db and remove connection obj
+  dbDisconnect(con)
   rm(con)
   
   # Move the raw data file to the processed folder ####
@@ -173,7 +177,8 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   file.create(processed_subdir)
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
-  return("Import Successful")
+  end <- now()
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END ####
 
