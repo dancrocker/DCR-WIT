@@ -153,10 +153,11 @@ path <- paste0(rawdatafolder,"/", file)
 df <- PREP_DATA(file = path)
 
 # Connect to db for queries below
-dsn <- filename.db
+dsn <- "DCR_DWSP_App_R"
 database <- "DCR_DWSP"
 schema <- 'Wachusett'
 tz <- 'UTC'
+
 con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ### Add missing columns ####
@@ -393,7 +394,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   start <- now()
   print(glue("Starting data import at {start}"))
   # Import the data to the database
-  dsn <- filename.db
+  dsn <- "DCR_DWSP_App_R"
   database <- "DCR_DWSP"
   schema <- "Wachusett"
   tz <- 'America/New_York'
