@@ -2,7 +2,7 @@
 #  TITLE: ImportPhytoplankton.R
 #  DESCRIPTION: This script will Format/Process MWRA data to DCR
 #  AUTHOR(S): Dan Crocker, Max Nyquist
-#  DATE LAST UPDATED: 2021-02-23
+#  DATE LAST UPDATED: 2021-03-31
 #  GIT REPO: 
 #  R version 3.6.0 (2019-04-26)  i386
 ##############################################################################.
@@ -22,6 +22,7 @@
 # library(DescTools)
 # library(devtools)
 # library(tidyr)
+# library(glue)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -102,9 +103,10 @@ df.wq$Magnification <- as.integer(as.character(df.wq$Magnification))
 
 # Connect to db for queries below
 database <- "DCR_DWSP"
+dsn <- filename.db
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 # 
 # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
 df_taxa_wach <- dbReadTable(con, Id(schema = schema, table = "tbl_PhytoTaxa"))
@@ -179,7 +181,7 @@ setIDs <- function(){
 df.wq$ID <- setIDs()
 
 df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)]
-# Reorder remaining 30 columns to match the database table exactly
+# Reorder remaining columns to match the database table exactly
 cnames <- dbListFields(con, schema = schema, ImportTable)
 names(df.wq) <- cnames
 
@@ -219,9 +221,14 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   # df.flags is an optional argument  - not used for this dataset
 
 # Establish db connection
-con <-  dbConnect(odbc::odbc(), database, timezone = tz)
-# Get Import Table Columns
-ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)# Get Import Table Columns
+
+  ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
 
 # # Set variable types -- not necessary because specified above?
 # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
