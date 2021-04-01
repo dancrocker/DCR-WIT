@@ -176,13 +176,12 @@ rm(con)
 return(dfs)
 } # END FUNCTION
 
-# dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, probe, ImportTable = ImportTable, ImportFlagTable = NULL )
-
-# Extract each element needed
+# dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, probe, ImportTable = ImportTable, ImportFlagTable = ImportFlagTable)
+# 
+# # Extract each element needed
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
-
 ########################################################################.
 ###                       Write Data to Database                    ####
 ########################################################################.
@@ -214,5 +213,5 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 ### END
 
-IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
-            ImportTable = ImportTable, ImportFlagTable = NULL)
+# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+#             ImportTable = ImportTable, ImportFlagTable = NULL)
