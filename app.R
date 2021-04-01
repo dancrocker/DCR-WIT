@@ -29,9 +29,9 @@ ipak <- function(pkg){
   sapply(pkg, require, character.only = TRUE)
 }
 
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi", "RDCOMClient")
 
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
@@ -39,9 +39,6 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
 
 # Load-Install Packages
 ipak(packages)
-
-library(RDCOMClient)
- 
 
 source("src/Functions/outlook_email.R", local = T)
 
@@ -60,10 +57,11 @@ MS <- config[5]
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
 
-database <- 'DCR_DWSP'
+dsn <- 'DCR_DWSP_App_R'
+database <- "DCR_DWSP"
 tz <- 'America/New_York'
-con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
-  
+con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
@@ -82,8 +80,7 @@ flagdatasets <- filter(datasets, !is.na(FlagTable))
 if (try(file.access(config[1], mode = 4)) == 0) {
   flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
     select(-3)
-  flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
-  
+} else {
   ### Get df Flags from Dropbox rds files
   df_flags_url <- config[30]
   datadir <- paste0(getwd(), "/rds_files")
@@ -92,6 +89,8 @@ if (try(file.access(config[1], mode = 4)) == 0) {
       write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
   flags <- read_rds(paste0(datadir, "/df_flags.rds"))
 }
+
+flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
 
 ### Get df Paramaeters from Dropbox rds files
 # df_wach_params_url <- config[31]
@@ -652,8 +651,7 @@ server <- function(input, output, session) {
       datatable(df.wq()) %>%
         formatDate(columns = c("DateTimeET"), method = 'toLocaleString')
     } else {
-      datatable(df.wq()) %>% 
-        formatDate(columns = c("SampleDate"), method = 'toLocaleString')
+      datatable(df.wq()) 
     }
   })
 
@@ -696,7 +694,6 @@ server <- function(input, output, session) {
   flagComment <- reactive({
     req(input$FlagComment)
     paste0("Comment for flagged records: ", input$FlagComment)
-
   })
   
   rds_updates2 <- reactive({
@@ -800,7 +797,7 @@ server <- function(input, output, session) {
    ### PROCESS FLAGS BUTTON ####
   df.manualflags <- eventReactive(input$processflags, {
     showModal(busyModal(msg = "Processing flags..."))
-    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
+    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), 
                                    flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords(), 
                                    comment = flagComment(), usertype = usertype, userlocation = userlocation)

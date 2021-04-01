@@ -152,7 +152,7 @@ df.wq$Units <- df_param$ParameterUnits[match(df.wq$Parameter, df_param$Parameter
 df.wq <- df.wq[, c(11, 1:5, 12, 6:10)]
 
 # Get column names from db table
-cnames <- dbListFields(con, schema = schema, ImportTable)
+cnames <- dbListFields(con, schema_name = schema, ImportTable)
 #list(cnames)
 names(df.wq) <- cnames
 

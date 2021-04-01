@@ -67,11 +67,11 @@ names(df.wq) = c("SampleGroup",
                  "Location",
                  "Description",
                  "TripNum",
-                 "LabRecDate",
+                 "LabRecDateET",
                  "SampleDate",
                  "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
+                 "PrepOnET",
+                 "DateTimeAnalyzedET",
                  "AnalyzedBy",
                  "Analysis",
                  "Parameter",
@@ -80,16 +80,19 @@ names(df.wq) = c("SampleGroup",
                  "Comment",
                  "SampledBy",
                  "Status")
+
 # Add missing variables:
 
                  df.wq$TextID <-  ""
                  df.wq$ReportedName <-  ""
                  df.wq$SampleNumber <-  ""
-                 df.wq$EDEP_Confirm <-  ""
-                 df.wq$EDEP_MW_Confirm <-  ""
+                 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
+                 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
                  df.wq$Reportable <-  ""
                  df.wq$Method <-  ""
                  df.wq$DetectionLimit <-  ""
+                 df.wq$Comment <- as.character(df.wq$Comment)
+                 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
 # Create a workbook object and add df.wq to it - save over the older workbook
 
@@ -145,21 +148,19 @@ df.wq <- df.wq[,c(1:25)]
 #-- If other miscellaneous Locations were part of this datset they should be corrected prior to importing data to database
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
+### Connect to Database   
+dsn <- filename.db
+database <- "DCR_DWSP"
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 #################################
 #  START REFORMATTING THE DATA  #
 #################################
 
-### Date and Time:
-df.wq$SampleDate <- mdy(df.wq$SampleDate)
-
-# SampleDateTime
-# Merge the date column with the Time Column and reformat to POSIXct
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+# Merge the actual date column with the new Time Column and reformat to POSIXct
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
 # Fix other data types
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -167,7 +168,7 @@ df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
@@ -184,9 +185,9 @@ df.wq$Location %<>%
 #   Add new Columns  #
 ######################
 
-### Unique ID number
-df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+### Unique ID number ####
+df.wq$UniqueID <- NA_character_
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -200,7 +201,7 @@ if (length(dupes) > 0){
 }
 ### Make sure records are not already in DB
 
-Uniq <- dbGetQuery(con,"SELECT UniqueID FROM tblWQALLDATA")
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
 dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
 
 if (length(dupes2) > 0){
@@ -212,10 +213,12 @@ if (length(dupes2) > 0){
 rm(Uniq)
 
 ### DataSource
-df.wq <- df.wq %>% mutate(DataSource = paste("MWRA", file,today(), sep = "_"))
+df.wq <- df.wq %>% mutate(DataSource = paste("MWRA", file,today(), sep = "_"),
+                          Imported_By = username,
+                          QAQC_By = NA_character_)
 ### DataSourceID
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -274,7 +277,7 @@ df.wq <- df.wq %>% mutate(ImportDate = today())
 
 ### IDs
 setIDs <- function(){
-  query.wq <- dbGetQuery(con, "SELECT max(ID) FROM tblWQALLDATA")
+  query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
   # Get current max ID
   if(is.na(query.wq)) {
     query.wq <- 0
@@ -293,7 +296,7 @@ df.wq$ID <- setIDs()
 
 setFlagIDs <- function(){
 
-  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblTribFlagIndex")
+  query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
   # Get current max ID
   if(is.na(query.flags)) {
     query.flags <- 0
@@ -339,7 +342,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 32 columns to match the database table exactly
-col.order.wq <- dbListFields(con, "tblWQALLDATA")
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 
@@ -371,26 +374,30 @@ return(dfs)
 # Write data to Database #
 ##########################
 
-IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 
-# This is preliminary data, so it shouldn't be in the database yet
-  # Connect to db using ODBC
-  con <-  odbcConnectAccess(filename.db)
-
-  # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
-
-  # WQ Data
-  ColumnsOfTable <- sqlColumns(con, "tblWQALLDATA")
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = "tblWQALLDATA", append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-  # Flag data - must have flags since this is preliminary data
-    sqlSave(con, df.flags, tablename = "tblTribFlagIndex", append = T,
-            rownames = F, colnames = F, addPK = F , fast = F)
-
+  start <- now()
+  print(glue("Starting data import at {start}"))
+  ### CONNECT TO DATABASE ####
+  ### Set DB
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  ### Connect to Database 
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+  
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+  
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+  } else {
+    print("There were no flags to import")
+  }
+  
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   # Move Preliminary csv files to the processed data folder
@@ -402,8 +409,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     perl =T)
 
   filelist2 <- paste0(rawdatafolder,"/", filelist)
+  ### Create the destination directory if it does not yet exist ####
+  sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
   file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))
-  return("Import Successful")
+  end <- now()
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END
 #IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable)

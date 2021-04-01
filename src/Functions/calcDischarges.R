@@ -20,17 +20,18 @@
 
 calcQ <- function(stages, userlocation) {
 # Set odbc connection  and get the rating table
+dsn <- "DCR_DWSP_App_R"
+database <- "DCR_DWSP"
+schema <- "Wachusett"
 tz <- 'America/New_York'
-schema = userlocation
-con <- dbConnect(odbc::odbc(), "DCR_DWSP", timezone = tz)
-ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  
+  ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
 rm(con)
 # Assigntoday's date as the end date for ratings that are still valid - so that date test won't compare against NA values
-now <- format(Sys.time(), "%Y-%m-%d")
-ratings$DateTimeEndET[is.na(ratings$DateTimeEndET)] <- now
+ratings$DateTimeEndET[is.na(ratings$DateTimeEndET)] <- Sys.time()
 # Pull stage records that need to get converted to discharge - use this df at the end of script to merge Q records with df_wq
 # stages <- ToCalc
 stages <- stages %>%

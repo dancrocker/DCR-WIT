@@ -75,10 +75,11 @@ df.wq <- df.wq[,c(1:26)]
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
 ### Connect to Database   
-database <- filename.db
+dsn <- filename.db
+database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -193,7 +194,7 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 
 ### Connect in UTC timezone, times come back in local timezone
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 locs <- df.wq$Location %>% unique()
 
@@ -252,16 +253,14 @@ hobo_rec <- hobo_rec %>%
 ########################################################################.
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "UTC") ### Connect in UTC timezone, times come back in local timezone
+tz <- 'UTC'
+con <- dbConnect(odbc::odbc(), database, uid = database, pwd = config[35], timezone = tz)
 # Below 2 lines same as above (can be deleted)
 # locs <- df.wq$Location %>% unique()
 # times <- df.wq$DateTimeET %>% with_tz("UTC") %>% unique() # convert to UTC in order to make query in db
 
 ### Pull hobo recs with matching timestamps
-qry_fp_rec <- paste0("SELECT * FROM tblStormFieldParameters WHERE Location IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
+qry_fp_rec <- paste0("SELECT * FROM [Wachusett].[tblStormFieldParameters] WHERE [Location] IN (", paste0("'",locs,"'", collapse = ","),") AND DateTimeUTC IN (", paste0("#",times,"#", collapse = ","), ")")
 fp_rec <- dbGetQuery(con, qry_fp_rec)
 
 if(any(!times %in% unique(fp_rec$DateTimeUTC))) {
@@ -341,9 +340,8 @@ if (length(dupes) > 0){
              "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
 }
 ### Make sure records are not already in DB ####
-
-Uniq <- dbGetQuery(con, paste0("SELECT UniqueID, ID FROM ", ImportTable))
-flags <- dbGetQuery(con, paste0("SELECT SampleID, FlagCode FROM ", ImportFlagTable," WHERE FlagCode = 102"))
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlayTable}] WHERE FlagCode = 102"))
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
@@ -390,7 +388,7 @@ df.wq$ImportDate <- Sys.Date()
 # Read Tables
 # WQ
 setIDs <- function(){
-query.wq <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportTable))
+query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
 # Get current max ID
 if(is.na(query.wq)) {
   query.wq <- 0
@@ -445,16 +443,16 @@ setFlagIDs <- function(){
   }
       
   if(class(df.flags) == "data.frame"){
-      query.flags <- dbGetQuery(con, paste0("SELECT max(ID) FROM ", ImportFlagTable))
-      # Get current max ID
-      if(is.na(query.flags)) {
-        query.flags <- 0
-      } else {
-        query.flags <- query.flags
-      }
-      ID.max.flags <- as.numeric(unlist(query.flags))
-      rm(query.flags)
-      
+    query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
+    # Get current max ID
+    if(is.na(query.flags)) {
+      query.flags <- 0
+    } else {
+      query.flags <- query.flags
+    }
+    ID.max.flags <- as.numeric(unlist(query.flags))
+    rm(query.flags)
+    
       
       ### ID flags
       df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
@@ -518,7 +516,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 30 columns to match the database table exactly
-col.order.wq <- dbListFields(con, ImportTable)
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 # QC Test
@@ -556,26 +554,26 @@ return(dfs)
 ##########################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
-# df.flags is an optional argument
+  start <- now()
+  print(glue("Starting data import at {start}"))
+  ### Connect to Database   
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- "Wachusett"
+  tz <- 'America/New_York'
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
 
-  con <-  odbcConnectAccess(filename.db)
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
-  # WQ Data ####
-  ColumnsOfTable <- sqlColumns(con, ImportTable)
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = ImportTable, append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-  # Flag data ####
-   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    sqlSave(con, df.flags, tablename = ImportFlagTable, append = T,
-            rownames = F, colnames = F, addPK = F , fast = F, verbose = F)
-   } else {
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+  } else {
     print("There were no flags to import")
   }
 
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   ### Move the processed raw data file to the processed folder ####
@@ -583,7 +581,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   dir.create(processed_subdir)
   processed_dir <- paste0(processedfolder, processed_subdir)
   file.rename(path, paste0(processed_dir,"/", file))
-  return("Import Successful")
+  
+  end <- now()
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END ####
 

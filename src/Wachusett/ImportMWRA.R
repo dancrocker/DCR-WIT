@@ -77,10 +77,11 @@ df.wq <- df.wq[,c(1:25)]
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
 
 ### Connect to Database   
-database <- filename.db
+dsn <- filename.db
+database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -420,7 +421,7 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 30 columns to match the database table exactly ####
-col.order.wq <- dbListFields(con, ImportTable)
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
@@ -464,11 +465,12 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   print(glue("Starting data import at {start}"))
   ### CONNECT TO DATABASE ####
   ### Set DB
-  database <- filename.db
+  dsn <- filename.db
+  database <- "DCR_DWSP"
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   ### Connect to Database 
-  con <- dbConnect(odbc::odbc(), database, timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
@@ -492,7 +494,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     
   file.rename(path, paste0(processed_dir,"/", file))
   end <- now()
-  return(print(glue("Import finished import at {end}, \n elapsed time {round(end - start)} seconds")))  
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
 }
 ### END ####
 

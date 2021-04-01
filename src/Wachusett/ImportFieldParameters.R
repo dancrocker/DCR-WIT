@@ -84,9 +84,11 @@ df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
 # Round times ####
 
     ### Connect to Database   
+    dsn <- "DCR_DWSP_App_R"
     database <- "DCR_DWSP"
+    schema <- 'Wachusett'
     tz <- 'America/New_York'
-    con <- dbConnect(odbc::odbc(), database, timezone = tz)
+    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
     locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
     flowlocations <- filter(locations, !is.na(LocationFlow))
@@ -116,6 +118,7 @@ df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
   print ("Data prep complete...")
   return(df)  
 } # End PREP DATA Function
+# df <- PREP_DATA(file = paste0(rawdatafolder, "/",file))
 
 UPDATE_IMPORTER_XL <- function() {
   print("Updating Field Parameter Importer excel file ...")
@@ -150,15 +153,18 @@ path <- paste0(rawdatafolder,"/", file)
 df <- PREP_DATA(file = path)
 
 # Connect to db for queries below
+dsn <- "DCR_DWSP_App_R"
 database <- "DCR_DWSP"
+schema <- 'Wachusett'
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ### Add missing columns ####
 # Get columns from table in db
 cols <- dbListFields(con, schema_name = schema, name = "tblTribFieldParameters")
 # Load tblParameters to access abbreviation for Unique ID
-params <- dbReadTable(con,Id(schema = schema, table = "tblParameters"))
+params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 
 # Add the ones that are missing
 for (col in cols) {
@@ -228,7 +234,6 @@ if (length(dupes) > 0){
   print(dupes) # Show the duplicate Unique IDs to user in Shiny
 }
 ### Make sure records are not already in DB
-
 
 Uniq <- dbGetQuery(con, glue("SELECT UniqueID, ID FROM {database}.{schema}.{ImportTable}"))
 
@@ -389,10 +394,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   start <- now()
   print(glue("Starting data import at {start}"))
   # Import the data to the database
-  database <- filename.db
+  dsn <- "DCR_DWSP_App_R"
+  database <- "DCR_DWSP"
   schema <- "Wachusett"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), database, timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
@@ -421,7 +427,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   
   UPDATE_IMPORTER_XL()
   end <- now()
-  return(print(glue("Import finished import at {end}, \n elapsed time {round(end - start)} seconds")))  
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
  }
 
 

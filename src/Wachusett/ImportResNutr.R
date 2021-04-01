@@ -68,10 +68,11 @@ if (length(which(str_detect(df.wq$Location, "GENERAL-GEN"),TRUE)) > 0) {
 
 
 # Connect to db for queries below
+dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), database, timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -343,8 +344,13 @@ return(dfs)
 ########################################################################.
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
-
-  con <-  dbConnect(odbc::odbc(), database, timezone = tz)
+  
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
 
   # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
 
@@ -358,7 +364,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   }
 
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
   #Move the processed raw data file to the processed folder
