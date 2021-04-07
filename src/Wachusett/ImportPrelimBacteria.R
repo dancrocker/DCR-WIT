@@ -166,6 +166,8 @@ df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
+df.wq$ResultReported <- as.character(df.wq$ResultReported)
+df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
 params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))

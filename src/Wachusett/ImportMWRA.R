@@ -137,6 +137,7 @@ df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
+df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
 
 if(all(!is.na(df.wq$LabRecDateET))) {
   df.wq$LabRecDateET <- as.POSIXct(paste(df.wq$LabRecDateET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
