@@ -83,14 +83,14 @@ names(df.wq) = c("SampleGroup",
 
 # Add missing variables:
 
-                 df.wq$TextID <-  ""
-                 df.wq$ReportedName <-  ""
-                 df.wq$SampleNumber <-  ""
+                 df.wq$TextID <-  NA_character_
+                 df.wq$ReportedName <-  NA_character_
+                 df.wq$SampleNumber <-  NA_character_
                  df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
                  df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
-                 df.wq$Reportable <-  ""
-                 df.wq$Method <-  ""
-                 df.wq$DetectionLimit <-  ""
+                 df.wq$Reportable <- NA_character_
+                 df.wq$Method <-  NA_character_
+                 df.wq$DetectionLimit <- NA_character_
                  df.wq$Comment <- as.character(df.wq$Comment)
                  df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
@@ -162,15 +162,12 @@ con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
 df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
+
 # Fix other data types
-df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
-df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
-df.wq$Comment <- as.character(df.wq$Comment)
-df.wq$ResultReported <- as.character(df.wq$ResultReported)
-df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
-df.wq$SampleNumber<- as.character(df.wq$SampleNumber)
-df.wq$Reportable <- as.character(df.wq$Reportable)
-df.wq$TextID <- as.character(df.wq$TextID)
+varchar_cols <- c("EDEP_Confirm", "EDEP_MW_Confirm", "Reportable", "Comment", "ResultReported",
+                  "SampleGroup", "SampleNumber", "TextID", "Method", "DetectionLimit")
+
+df.wq[,varchar_cols] = lapply(df.wq[,varchar_cols], as.character)
 
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
