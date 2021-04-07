@@ -168,6 +168,10 @@ df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
 df.wq$Comment <- as.character(df.wq$Comment)
 df.wq$ResultReported <- as.character(df.wq$ResultReported)
 df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
+df.wq$SampleNumber<- as.character(df.wq$SampleNumber)
+df.wq$Reportable <- as.character(df.wq$Reportable)
+df.wq$TextID <- as.character(df.wq$TextID)
+
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
 params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
@@ -270,10 +274,10 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
   # df.wq$StormSample <- 0 %>%  as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.character()
+df.wq$StormSampleN <- NA_character_
 
 ### Importdate (Date)
-df.wq <- df.wq %>% mutate(ImportDate = today())
+df.wq$ImportDate <- Sys.Date() %>% force_tz("America/New_York")
 
 #####################################################################
 
