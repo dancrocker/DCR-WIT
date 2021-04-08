@@ -15,7 +15,6 @@
 #             library(tidyverse)
 #             library(stringr)
 #             library(odbc)
-#             library(RODBC)
 #             library(DBI)
 #             library(readxl)
 #             library(lubridate)
@@ -23,103 +22,77 @@
 #             library(openxlsx)
 #             library(data.table)
 
-
-##############
-# PREP DATA  #  This function combines all of the preliminary bacteria csv files into 1 xlsx file
-##############
-
-PREP_DATA <- function(rawdatafolder){
-
-#These variables are the same as what is listed in datasets.xlsx
-rawdatafolder <- rawdatafolder
-
-### Generate a list of the preliminary data files:
-filelist <- grep(
-  x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-  pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
-  value = T,
-  perl =T)
-
-# Add the path to each file and save as a new list
-filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
 ###################################################################################################
 # Set system environments (Future - try to set this up to be permanent)
 # Without setting these envs the openxlsx saveWorkbook fn cannot zip the file and save it
           # Sys.setenv("R_ZIPCMD" = "C:/rtools40/usr/bin/zip.exe")
           # Sys.setenv(PATH = paste("C:/rtools40/usr/bin", Sys.getenv("PATH"), sep=";"))
           # Sys.setenv(BINPREF = "C:/rtools40/mingw$(WIN)/usr/bin/")
-          # Check system environments
+          # # Check system environments
           # Sys.getenv("R_ZIPCMD", "zip")
           # Sys.getenv("PATH") # Rtools should be listed now
 ###################################################################################################
-# Read in all preliminary files and combine into 1
-tables <- lapply(filelist2, read.csv, header = TRUE)
-#a <-  tables[[3]]
-
-# Combine files
-combined.df <- rbindlist(tables)
-# mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
-
-# Filter out unneeded columns and save to new df
-df.wq <- combined.df[, -c(16,18:22,24:25)]
-# Rename Columns to match existing format
-names(df.wq) = c("SampleGroup",
-                 "Location",
-                 "Description",
-                 "TripNum",
-                 "LabRecDateET",
-                 "SampleDate",
-                 "SampleTime",
-                 "PrepOnET",
-                 "DateTimeAnalyzedET",
-                 "AnalyzedBy",
-                 "Analysis",
-                 "Parameter",
-                 "ResultReported",
-                 "Units",
-                 "Comment",
-                 "SampledBy",
-                 "Status")
-
-# Add missing variables:
-
-                 df.wq$TextID <-  NA_character_
-                 df.wq$ReportedName <-  NA_character_
-                 df.wq$SampleNumber <-  NA_character_
-                 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
-                 df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
-                 df.wq$Reportable <- NA_character_
-                 df.wq$Method <-  NA_character_
-                 df.wq$DetectionLimit <- NA_character_
-                 df.wq$Comment <- as.character(df.wq$Comment)
-                 df.wq$ResultReported <- as.character(df.wq$ResultReported)
-
-# Create a workbook object and add df.wq to it - save over the older workbook
-
-      wb <- paste0(rawdatafolder,"/PrelimBacteria.xlsx")
-      wbobj <- createWorkbook(wb)
-      addWorksheet(wbobj, "Sheet 1")
-      writeData(wbobj, sheet = 1, df.wq, colNames = T)
-# Save the workbook and then proceed (This will overwrite the existing file)
-saveWorkbook(wbobj, wb, overwrite = TRUE)
-} # End PREP DATA FUNCTION
 
 #############################
 #   PROCESSING FUNCTION    #
 ############################
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable){
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
-# Get the full path to the file
-
-PREP_DATA(rawdatafolder = rawdatafolder)
+  
+  ### Generate a list of the preliminary data files:
+  filelist <- grep(
+    x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
+    pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
+    value = T,
+    perl =T)
+  
+  # Add the path to each file and save as a new list
+  filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
+  
+  # Read in all preliminary files and combine into 1
+  tables <- lapply(filelist2, read.csv, header = TRUE)
+  
+  # Combine files
+  combined.df <- rbindlist(tables)
+  # mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
+  
+  # Filter out unneeded columns and save to new df
+  df.wq <- combined.df[, -c(16,18:22,24:25)]
+  
+  # Rename Columns to match existing format
+  names(df.wq) = c("SampleGroup",
+                   "Location",
+                   "Description",
+                   "TripNum",
+                   "LabRecDateET",
+                   "SampleDate",
+                   "SampleTime",
+                   "PrepOnET",
+                   "DateTimeAnalyzedET",
+                   "AnalyzedBy",
+                   "Analysis",
+                   "Parameter",
+                   "ResultReported",
+                   "Units",
+                   "Comment",
+                   "SampledBy",
+                   "Status")
+  
+  # Add missing variables:
+  
+  df.wq$TextID <-  NA_character_
+  df.wq$ReportedName <-  NA_character_
+  df.wq$SampleNumber <-  NA_character_
+  df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
+  df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
+  df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_MW_Confirm)
+  df.wq$Reportable <- NA_character_
+  df.wq$Method <-  NA_character_
+  df.wq$DetectionLimit <- NA_character_
+  df.wq$Comment <- as.character(df.wq$Comment)
+  df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
   path <- paste0(rawdatafolder,"/", file)
-  # file <- "PrelimBacteria.xlsx"
-# Read in the data to a dataframe
-df.wq <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
-  as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
-df.wq <- df.wq[,c(1:25)]
-### Perform Data checks ###
 
 # At this point there could be a number of checks to make sure data is valid
   # Check to make sure there are 25 variables (columns)
@@ -142,7 +115,6 @@ df.wq <- df.wq[,c(1:25)]
     stop("There are unspecified (MISC) locations that need to be corrected before importing data")
   }
 
-
 ### OTHER MESSAGES AND WARNINGS:
 # "All MISC sample locations were automatically converted to location MD75.4
 #-- If other miscellaneous Locations were part of this datset they should be corrected prior to importing data to database
@@ -162,12 +134,25 @@ con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
 df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
+# Fix all other date-time cols
+if(all(!is.na(df.wq$LabRecDateET))) {
+  df.wq$LabRecDateET <- parse_date_time(df.wq$LabRecDateET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$LabRecDateET <- as_datetime(df.wq$LabRecDateET)
+}
 
-# Fix other data types
-varchar_cols <- c("EDEP_Confirm", "EDEP_MW_Confirm", "Reportable", "Comment", "ResultReported",
-                  "SampleGroup", "SampleNumber", "TextID", "Method", "DetectionLimit")
+if(all(!is.na(df.wq$PrepOnET))) {
+  df.wq$PrepOnET <- parse_date_time(df.wq$PrepOnET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$PrepOnET <- as_datetime(df.wq$PrepOnET)
+}
 
-df.wq[,varchar_cols] = lapply(df.wq[,varchar_cols], as.character)
+if(all(!is.na(df.wq$DateTimeAnalyzedET))) {
+  df.wq$DateTimeAnalyzedET <- parse_date_time(df.wq$DateTimeAnalyzedET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
+}
+
 
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
@@ -216,7 +201,7 @@ if (length(dupes2) > 0){
 rm(Uniq)
 
 ### DataSource
-df.wq <- df.wq %>% mutate(DataSource = paste("MWRA", file,today(), sep = "_"),
+df.wq <- df.wq %>% mutate(DataSource = paste("MWRA_Preliminary_Results",today(), sep = "_"),
                           Imported_By = username,
                           QAQC_By = NA_character_)
 ### DataSourceID
@@ -311,11 +296,11 @@ setFlagIDs <- function(){
 
   # Generate flags for above/below detection records
   df.flag1 <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID) %>%
+    rename("SampleID" = ID) %>%
     drop_na()
   # Generate flags for every record indicating that it is a preliminary record = 102
   df.flag2 <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID)
+    rename("SampleID" = ID)
   df.flag2$FlagCode <- 102
   # Merge the two flag dfs into 1
   df.flags <- rbind(df.flag1, df.flag2)
@@ -347,7 +332,7 @@ df.wq <- df.wq %>% select(-c(Description,
 
 # Reorder remaining 32 columns to match the database table exactly
 col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
-df.wq <-  df.wq[,col.order.wq]
+df.wq <-  df.wq %>% select(all_of(col.order.wq))
 
 
 # Create a list of the processed datasets
@@ -412,7 +397,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     value = T,
     perl =T)
 
-  filelist2 <- paste0(rawdatafolder,"/", filelist)
+  filelist2 <- paste0(rawdatafolder, filelist)
   ### Create the destination directory if it does not yet exist ####
   sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
   file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))

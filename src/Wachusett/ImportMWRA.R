@@ -296,13 +296,13 @@ if (nrow(query.prelim) > 0) {# If true there is at least one record in the time 
   qryDelete <- dbGetQuery(con,qryS) # Check the query to see if it returns any matches
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
   if(nrow(qryDelete) > 0) {
-    qryDeletePrelimData <- glue("DELETE * FROM [{schema}].[{ImportTable}] WHERE [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
+    qryDeletePrelimData <- glue("DELETE * FROM [{schema}].[{ImportTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
     rs <- dbSendStatement(con,qryDeletePrelimData)
     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
     dbClearResult(rs)
 
 # Next delete all flags associated with preliminary data - Will also delete any other flag associated with record number
-    qryDeletePrelimFlags <- glue("DELETE * FROM [{schema}].[{ImportFlagTable}] WHERE [SampleID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
+    qryDeletePrelimFlags <- glue("DELETE * FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
     rs <- dbSendStatement(con, qryDeletePrelimFlags)
     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
     dbClearResult(rs)
