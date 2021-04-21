@@ -25,12 +25,14 @@
 ###################################################################################################
 # Set system environments (Future - try to set this up to be permanent)
 # Without setting these envs the openxlsx saveWorkbook fn cannot zip the file and save it
-          # Sys.setenv("R_ZIPCMD" = "C:/rtools40/usr/bin/zip.exe")
-          # Sys.setenv(PATH = paste("C:/rtools40/usr/bin", Sys.getenv("PATH"), sep=";"))
-          # Sys.setenv(BINPREF = "C:/rtools40/mingw$(WIN)/usr/bin/")
-          # # Check system environments
-          # Sys.getenv("R_ZIPCMD", "zip")
-          # Sys.getenv("PATH") # Rtools should be listed now
+
+Sys.setenv("R_ZIPCMD" = "C:/rtools40/usr/bin/zip.exe")
+Sys.setenv(PATH = paste("C:/rtools40/usr/bin", Sys.getenv("PATH"), sep=";"))
+Sys.setenv(BINPREF = "C:/rtools40/mingw$(WIN)/usr/bin/")
+
+# Check system environments
+# Sys.getenv("R_ZIPCMD", "zip")
+# Sys.getenv("PATH") # Rtools should be listed now
 ###################################################################################################
 
 #############################
