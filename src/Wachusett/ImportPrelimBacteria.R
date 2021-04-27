@@ -399,12 +399,12 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     value = T,
     perl =T)
 
-  filelist2 <- paste0(rawdatafolder, filelist)
+  filelist2 <- paste0(rawdatafolder,"/", filelist)
   ### Create the destination directory if it does not yet exist ####
   sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
   file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))
   end <- now()
-  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
+  print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds"))  
 }
 ### END
 #IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable)
