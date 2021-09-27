@@ -174,9 +174,12 @@ df.wq$ResultReported[-edits] <- as.character(update)
 df.wq <- df.wq %>%
   mutate("IsCensored" = NA_integer_)
 
-df_wq$IsCensored <- as.logical(df_wq$IsCensored)
-df.wq$IsCensored[-edits] <- FALSE
-df.wq$IsCensored[edits] <- TRUE
+if(length(edits) == 0) {
+  df.wq$IsCensored <- FALSE
+} else {
+  df.wq$IsCensored[edits] <- TRUE
+  df.wq$IsCensored[-edits] <- FALSE
+}
 
 ### FinalResult (numeric) ####
 # Make the variable
