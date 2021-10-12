@@ -77,7 +77,7 @@ if (userlocation == "Wachusett") {
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-if (try(file.access(config[1], mode = 4)) == 0) {
+if (try(dir.exists(config[1]))) {
   flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
     select(-3)
 } else {
