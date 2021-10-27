@@ -160,9 +160,9 @@ names(df.wq) <- cnames
 df.wq$ID <- as.integer(df.wq$ID)
 df.wq$DataSourceID <- as.integer(df.wq$DataSourceID)
 
-# Change time to UTC in DateTimeET
-df.wq$DateTimeET <- format(df.wq$DateTimeET, tz = "America/New_York", usetz = TRUE) %>%
-  lubridate::as_datetime()
+# # Change time to UTC in DateTimeET NOT NECESSARY FOR PROFILES
+# df.wq$DateTimeET <- format(df.wq$DateTimeET, tz = "America/New_York", usetz = TRUE) %>%
+#   lubridate::as_datetime()
 
 # Create a list of the processed datasets
 dfs <- list()
