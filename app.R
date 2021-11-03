@@ -22,6 +22,15 @@ print(paste0("WIT App lauched at ", Sys.time()))
 
 ### Load packages
 
+if (!"RDCOMClient" %in% installed.packages(lib.loc = config[15])[, "Package"]) {
+  print("RDCOMClient Package not found in library. Installing now...")
+  devtools::install_github("BSchamberger/RDCOMClient")
+}
+# install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
+# Envoke package update every so often to update packages
+# update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
+
+
 ipak <- function(pkg){
   new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[15])[, "Package"])]
   if (length(new.pkg))
@@ -32,10 +41,6 @@ ipak <- function(pkg){
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
               "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi", "RDCOMClient")
-
-# install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
-# Envoke package update every so often to update packages
-# update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
 # Load-Install Packages
 ipak(packages)
