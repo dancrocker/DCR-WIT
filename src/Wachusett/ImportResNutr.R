@@ -202,6 +202,19 @@ edits <- str_detect(df.wq$ResultReported, paste(c("<",">"), collapse = '|')) %>%
 update <- as.numeric(df.wq$ResultReported[-edits], digits = 6)
 df.wq$ResultReported[-edits] <- as.character(update)
 
+# Add new column for censored data
+df.wq <- df.wq %>%
+  mutate("IsCensored" = NA_integer_)
+
+df.wq$IsCensored <- as.logical(df.wq$IsCensored)
+
+if(length(edits) == 0) {
+  df.wq$IsCensored <- FALSE
+} else {
+  df.wq$IsCensored[edits] <- TRUE
+  df.wq$IsCensored[-edits] <- FALSE
+}
+
 ### FinalResult (numeric)
 # Make the variable
 df.wq$FinalResult <- NA
