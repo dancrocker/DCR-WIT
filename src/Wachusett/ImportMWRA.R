@@ -295,18 +295,30 @@ df.wq$ImportDate <- Sys.Date() %>% force_tz("America/New_York")
 ########################################################################.
 ###                      REMOVE ANY PRELIMINARY DATA                ####
 ########################################################################.
+### Get Locations table to generate list of applicable locations
+locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
+
+### Filter down to only locations with preliminary bacteria (Primary/secondary Tribs and Transect)
+prelim_locs <- locations %>% 
+  filter(LocationType %in% c("Tributary", "Transect"),
+         LocationCategory != "Long-term Forestry") %>% 
+  pull(LocationMWRA)
 
 # Calculate the date range of import ####
 datemin <- min(df.wq$DateTimeET)
 datemax <- max(df.wq$DateTimeET)
 
-# IDs to look for - all records in time peroid in question
-qry <- glue("SELECT [ID] FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
+# IDs to look for - all records in time period in question
+qry <- glue("SELECT [ID] [Location] FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
 query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
 
-if (nrow(query.prelim) > 0) {# If true there is at least one record in the time range of the data
+query.prelim <- query.prelim %>% 
+  filter(Location %in% prelim_locs) %>% 
+  pull(ID)
+
+if (length(query.prelim) > 0) {# If true there is at least one record in the time range of the data
   # SQL query that finds matching record ID from tblSampleFlagIndex Flagged 102 within date range in question
-  qryS <- sprintf("SELECT [SampleID] FROM [Wachusett].[tblTribFlagIndex] WHERE [FlagCode] = 102 AND [SampleID] IN (%s)", paste(as.character(query.prelim$ID), collapse=', '))
+  qryS <- sprintf("SELECT [SampleID] FROM [Wachusett].[tblTribFlagIndex] WHERE [FlagCode] = 102 AND [SampleID] IN (%s)", paste(as.character(query.prelim), collapse=', '))
   qryDelete <- dbGetQuery(con, qryS) # Check the query to see if it returns any matches
   
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
@@ -317,7 +329,7 @@ if (nrow(query.prelim) > 0) {# If true there is at least one record in the time 
     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
     dbClearResult(rs)
     ### Delete from tblMWRAResults
-    qryDeletePrelimData <- sprintf(glue("DELETE FROM [{schema}].[{ImportTable}] WHERE [ID] IN (%s)"), paste(as.character(query.prelim$ID), collapse=', '))
+    qryDeletePrelimData <- sprintf(glue("DELETE FROM [{schema}].[{ImportTable}] WHERE [ID] IN (%s)"), paste(as.character(query.prelim), collapse=', '))
     rs <- dbSendStatement(con,qryDeletePrelimData)
     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
     dbClearResult(rs)
