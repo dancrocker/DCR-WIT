@@ -30,6 +30,7 @@
     # library(magrittr)
     # library(readxl)
     # library(testthat)
+    # library(glue)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -309,7 +310,7 @@ datemin <- min(df.wq$DateTimeET)
 datemax <- max(df.wq$DateTimeET)
 
 # IDs to look for - all records in time period in question
-qry <- glue("SELECT [ID] [Location] FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
+qry <- glue("SELECT [ID],[Location] FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
 query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
 
 query.prelim <- query.prelim %>% 
