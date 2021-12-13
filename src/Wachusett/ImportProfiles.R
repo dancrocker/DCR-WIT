@@ -224,6 +224,21 @@ return(dfs)
 ########################################################################.
 ###                       Write Data to Database                    ####
 ########################################################################.
+GET_SECCHI <- function(path,file){
+
+   #return NULL if no data frame 
+  if(is.na(df.secchi$Secchi_ft)){
+   df.secchi <- NULL
+    return(NULL)
+    }else{
+    as.data.frame(df.secchi)
+  }
+  
+}
+
+
+GET_SECCHI(path, file)
+
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   # df.flags is an optional argument  - not used for this dataset
@@ -241,6 +256,19 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
   # sqlSave(con, df.wq, tablename = ImportTable, append = T,
   #         rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
+  #call GET_SECCHI
+  GET_SECCHI(path,file)
+ #assign df.secchi to correct value. NULL if no data, clean record if present
+   df.secchi <- GET_SECCHI(path,file)
+ #test df.secchi for NULL, if null, let importer know. if data present, confirm
+null.secchi <- function(path,file){  
+  if(is.null(df.secchi)){
+    return("No Secchi data. No records imported.")
+    }else{
+      return("{df.secchi$Date} Secchi value of {df.secchi$Depth_ft} imported")
+      }
+}
+
   
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
   
