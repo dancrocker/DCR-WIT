@@ -9,17 +9,22 @@
 
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
-# library(tidyverse)
-# library(stringr)
-# library(odbc)
-# library(RODBC)
-# library(DBI)
-# library(lubridate)
-# library(magrittr)
-# library(readxl)
-# library(DescTools)
+library(tidyverse)
+library(stringr)
+library(odbc)
+library(RODBC)
+library(DBI)
+library(lubridate)
+library(magrittr)
+library(readxl)
+library(DescTools)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
+### MN - bring in data streams for testing.
+datset <- config[8]
+files <- readxl::read_xlsx(datset)
+rawdatafolder <- paste0(files[2,11])
+file <-  paste0("2021_", files[2,14])
 
 ########################################################################.
 ###                          Process Data                           ####
@@ -42,6 +47,32 @@ sheetName <- excel_sheets(path)[sheetNum]
 # Read in the raw data - defaults to the last sheet added
 df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("A:R"),  col_names = F, trim_ws = T, na = "nil") %>%
   as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
+
+# Read in the raw data - defaults to the last sheet added
+df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("A:R"),  col_names = F, trim_ws = T, na = "nil") %>%
+  as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
+#Separate Secchi notes, analyst, depth data before slice
+df.secchi <- df.wq %>%
+  slice(1:4)
+#Select columns
+df.secchi <- df.secchi[c(2:4), c(1:3,6,7)]
+#Get rid of NA from spreadsheet. Names will be set later
+df.secchi$...3 <- str_replace_na(df.secchi$...3, replacement =  "")
+#Concat to track depth feet and depth meters
+df.secchi <- df.secchi %>%
+  mutate(...1 = str_c(...1, ...3, sep = "_"))
+#df.secchi$...1 <- paste(df.secchi$...1, df.secchi$...3, sep = "_")
+#df.secchi.t <- df.secchi %>%
+# gather(., param, result, -...1)
+#Workaround for binding specific columns below 2 first rows
+df.secchi <- rbind(df.secchi[1:2], setNames(df.secchi[4:5], names(df.secchi)[1:2])) %>%
+  rename(., param = ...1, result = ...2)
+#  Pivot and spread columns.
+df.secchi  <- df.secchi %>%
+  pivot_wider(names_from = param, values_from = result ) %>%
+  select(1:5)
+
+
 
 # Remove unwanted columns, discard first 4 rows, filter out empty rows (NA inf column 1), add a new row
 df.wq <- df.wq %>%
@@ -67,6 +98,14 @@ df.wq <- gather(df.wq, Parameter, Result, c(7:16))
 # DateTimeET
 df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$Date, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
+#Select columns for Secchi database table
+df.secchi.join <- df.wq[, c(1, 3, 4, 8)]
+#Unique Secchi, should filter to 1 row
+df.secchi.join <- tail(df.secchi.join, n=1)
+#Join df.secchi and df.secchi.join
+df.secchi <- left_join(df.secchi, df.secchi.join, by = c("Secchi_m" = "Secchi Depth"))
+#Remove Secchi join
+rm(df.secchi.join)
 #Get rid of UserID, Date,Time and Secchi
 df.wq <- df.wq[, c(4,12, 10, 7, 11, 5)]
 
