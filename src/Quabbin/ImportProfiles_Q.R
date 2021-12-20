@@ -2,7 +2,7 @@
 #     Title: ImportProfiles_Q.R
 #     Description: This script will process/import reservoir Profile Data from YSI EXO to database - adapted from Wachusett script
 #     Written by: Dan Crocker, Max Nyquist, Brett Boisjolie
-#     Last Update: December 20, 2021
+#     Last Update: December 19, 2021
 #
 ##############################################################################################################################
 
