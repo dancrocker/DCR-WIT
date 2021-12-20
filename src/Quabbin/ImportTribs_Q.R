@@ -2,7 +2,7 @@
 #     Title: ImportTribs_Q.R
 #     Description: This script will process/import Quabbin Trib Field Parameter Data from YSI ProQuatro to database
 #     Written by: Brett Boisjolie
-#     Last Update: August 2021
+#     Last Update: Dec 20 2021
 #
 ##############################################################################################################################
 
