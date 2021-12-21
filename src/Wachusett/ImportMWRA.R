@@ -325,7 +325,7 @@ if (length(query.prelim) > 0) {# If true there is at least one record in the tim
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
   if(nrow(qryDelete) > 0) {
     ### Delete from flag table
-    qryDeletePrelimFlags <- sprintf(glue("DELETE FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN (%s)"), paste(as.character(query.prelim$ID), collapse=', '))
+    qryDeletePrelimFlags <- sprintf(glue("DELETE FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN (%s)"), paste(as.character(query.prelim), collapse=', '))
     rs <- dbSendStatement(con, qryDeletePrelimFlags)
     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
     dbClearResult(rs)
