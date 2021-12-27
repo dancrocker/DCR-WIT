@@ -83,7 +83,7 @@ if (userlocation == "Wachusett") {
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
 if (try(dir.exists(config[1]))) {
-  flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
+  flags <- dbReadTable(con2, Id(schema = "Wachusett", table = "tblFlags")) %>%
     select(-3)
 } else {
   ### Get df Flags from Dropbox rds files
@@ -431,6 +431,7 @@ server <- function(input, output, session) {
         })
   
   unmatchedtimes  <- reactive({
+    req(dfs())
     req(ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
          dfs()[[4]]
         })
