@@ -193,6 +193,13 @@ return(dfs)
 ########################################################################.
 GET_SECCHI <- function(path,file){
   
+  # Assign the sheet number
+  sheetNum <- as.numeric(length(excel_sheets(path)))
+  
+  ### Must add a check here for CI. If CI in sheetName, skip secchi df build (we do not collect at Cosgrove) 
+  # Assign the sheet name
+  sheetName <- excel_sheets(path)[sheetNum]
+  
   df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("A:R"),  col_names = F, trim_ws = T, na = "nil") %>%
     as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
   
