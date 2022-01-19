@@ -22,7 +22,7 @@ print(paste0("WIT App lauched at ", Sys.time()))
 
 ### Load packages
 
-if (!"RDCOMClient" %in% installed.packages(lib.loc = config[15])[, "Package"]) {
+if (!"RDCOMClient" %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"]) {
   print("RDCOMClient Package not found in library. Installing now...")
   devtools::install_github("BSchamberger/RDCOMClient")
 }
@@ -32,9 +32,9 @@ if (!"RDCOMClient" %in% installed.packages(lib.loc = config[15])[, "Package"]) {
 
 
 ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[15])[, "Package"])]
+  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"])]
   if (length(new.pkg))
-    install.packages(new.pkg, lib = config[15], dependencies = TRUE, repos="http://cran.rstudio.com/")
+    install.packages(new.pkg, lib = config[["R_lib_Path"]], dependencies = TRUE, repos="http://cran.rstudio.com/")
   sapply(pkg, require, character.only = TRUE)
 }
 
@@ -47,17 +47,28 @@ ipak(packages)
 
 source("src/Functions/outlook_email.R", local = T)
 
+### Set Location Dependent Variables - datatsets and distro
+if (userlocation == "Wachusett") {
+  rootdir <- wach_team_root
+  datasets <-  read_excel(paste0(wach_team_root,config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) 
+} else {
+  rootdir <- quab_team_root
+  datasets <-  read_excel(paste0(quab_team_root,config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
+    filter(ImportMethod == "Importer-R")
+}
+
 # Set user info
+
 user <-  Sys.getenv("USERNAME") %>% toupper()
-userdata <- readxl::read_xlsx(path = config[17])
+userdata <- readxl::read_xlsx(path = paste0(rootdir,config[["Users"]]))
 userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
-userlocation <<- userinfo$Location[1]
+# userlocation <<- userinfo$Location[1]
 usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
 schema <<- userlocation
 # Specify mail server
-MS <- config[5]
+# MS <- config[5]
 
 ### Connect to Database  
 ### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
@@ -65,34 +76,22 @@ MS <- config[5]
 dsn <- 'DCR_DWSP_App_R'
 database <- "DCR_DWSP"
 tz <- 'America/New_York'
-con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
-
-### Set Location Dependent Variables - datatsets and distro
-if (userlocation == "Wachusett") {
-  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
-} else {
-  if (userlocation == "Quabbin") {
-    datasets <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
-    filter(ImportMethod == "Importer-R")
-  } else {
-    datasets <-  read_excel(config[10], sheet = 1, col_names = T, trim_ws = T) %>% # This is a placeholder for BK forestry data... to be deprecated
-      filter(ImportMethod == "Importer-R")
-  }
-}
+con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-if (try(dir.exists(config[1]))) {
+if (try(dir.exists(paste0(rootdir, config[["DataCache"]])))) {
   flags <- dbReadTable(con2, Id(schema = "Wachusett", table = "tblFlags")) %>%
     select(-3)
 } else {
+  print("Data cache unavailable")
   ### Get df Flags from Dropbox rds files
-  df_flags_url <- config[30]
-  datadir <- paste0(getwd(), "/rds_files")
-  dir.create(file.path(datadir), showWarnings = FALSE)
-  GET(df_flags_url, 
-      write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
-  flags <- read_rds(paste0(datadir, "/df_flags.rds"))
+#   df_flags_url <- config[["df_flags.rds_dropbox_url"]]
+#   datadir <- paste0(getwd(), "/rds_files")
+#   dir.create(file.path(datadir), showWarnings = FALSE)
+#   GET(df_flags_url, 
+#       write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
+#   flags <- read_rds(paste0(datadir, "/df_flags.rds"))
 }
 
 flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
@@ -323,7 +322,7 @@ server <- function(input, output, session) {
   })
   rawdatafolder <- reactive({
     req(ds())
-    ds()$RawFilePath[1]
+    paste0(rootdir, ds()$RawFilePath[1])
   })
   ImportTable <- reactive({
     req(ds())
@@ -335,7 +334,7 @@ server <- function(input, output, session) {
   })
   processedfolder <- reactive({
     req(ds())
-    ds()$ProcessedFilePath[1]
+    paste0(rootdir, ds()$ProcessedFilePath[1])
   })
 
   filename.db <- reactive({
@@ -438,7 +437,7 @@ server <- function(input, output, session) {
   
   ### Import Email Message ####
   qcpath <- reactive({
-    paste0("file:///", str_replace_all(config[28],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
+    paste0("file:///", str_replace_all(config[["QC_Logfiles"]],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
   })
   reactive_emailmsg <- reactiveVal(
     ""
@@ -447,7 +446,7 @@ server <- function(input, output, session) {
     ""
   )  
   observeEvent(input$import, {
-    if(file.exists(paste0(config[28],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+    if(file.exists(paste0(config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
       reactive_emailmsg(
         paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p>
                <p>Warning: Quality control outliers found in imported data. See QC Log <a href=",qcpath(),">",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
@@ -945,9 +944,9 @@ server <- function(input, output, session) {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
               print(paste0("RDS update functions to call: ", isolate(rdsList())))
               rscript(
-                script = config[11], 
+                script = paste0(wach_team_root, config[["update_WAVE.R"]]), 
                 cmdargs = isolate(rdsList()),
-                libpath = config[15],
+                libpath = config[["R_lib_Path"]],
                 repos = default_repos(),
                 stdout = "updateWAVE.log",
                 stderr = "2>&1",
@@ -961,7 +960,7 @@ server <- function(input, output, session) {
                 user_profile = FALSE,
                 env = rcmd_safe_env(),
                 timeout = Inf,
-                wd = config[13], 
+                wd = paste0(rootdir, config[["WAVE-WIT update folder"]]), 
                 fail_on_status = TRUE,
                 color = FALSE
               )

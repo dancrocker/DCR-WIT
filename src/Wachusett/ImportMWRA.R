@@ -21,14 +21,6 @@
     # library(lubridate)
     # library(magrittr)
     # library(readxl)
-    # library(tidyverse)
-    # library(stringr)
-    # library(odbc)
-    # library(RODBC)
-    # library(DBI)
-    # library(lubridate)
-    # library(magrittr)
-    # library(readxl)
     # library(testthat)
     # library(glue)
 
@@ -82,7 +74,7 @@ dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -499,7 +491,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   ### Connect to Database 
-  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 

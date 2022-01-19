@@ -19,7 +19,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
   
   files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
   
-  datadir <- config[1]
+  datadir <- paste0(wach_team_root, config[["DataCache"]])
   rds_files <- list.files(datadir, full.names = F , pattern = ".rds")
   rds_in <- which(rds_files %in% files) %>% as.numeric()
   rds_files <- rds_files[rds_in]
@@ -130,23 +130,23 @@ for (i in 1:nrow(df.qccheck)){
 
 
 ### Print results of outlier check to unique WIT log
-
+QC_log_dir <- paste0(wach_team_root,"DataManagement/", config[["QC_Logfiles"]])
   # Delete a log of the same name if it exists
-  if (file.exists(paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
-    file.remove(paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
+  if (file.exists(paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+    file.remove(paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
   }
 
   # If values exist outside historical range for site/parameter/units, print QC log file, create message for email.
   if (nrow(rangeoutliers)>0 & nrow(statoutliers)==0){
     options(width=10000)
     rangeoutliers <- rangeoutliers %>% arrange(ID)
-    sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+    sink(file = paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
     cat("WIT Quality Control Log\n\n")
     cat(paste0("Data imported at: ",Sys.time(),"\n"))
     cat(paste0("File: ",file,"\n"))
     cat(paste0("Database table: ",ImportTable,"\n\n"))
     cat(paste0(nrow(rangeoutliers)," record(s) outside historical range.\n\n"),append=T)
-    capture.output(print(rangeoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","HistoricalMean","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+    capture.output(print(rangeoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","HistoricalMean","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
     cat("\n\n")
     sink()
     qc_message <- paste0("File ",file," processed at ",Sys.time(),". ",nrow(rangeoutliers)," record(s) outside historical range. See QC Log ",paste0(ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
@@ -157,13 +157,13 @@ for (i in 1:nrow(df.qccheck)){
     if (nrow(rangeoutliers)==0 & nrow(statoutliers)>0){
       options(width=10000)
       statoutliers <- statoutliers %>% arrange(ID)
-      sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+      sink(file = paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
       cat("WIT Quality Control Log\n\n")
       cat(paste0("Data imported at: ",Sys.time(),"\n"))
       cat(paste0("File: ",file,"\n"))
       cat(paste0("Database table: ",ImportTable,"\n\n"))
       cat(paste0(nrow(statoutliers)," potential statistical outlier(s) in imported data.\n\n"),append=T)
-      capture.output(print(statoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+      capture.output(print(statoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
       cat("\n\n")
       sink()
       qc_message <- paste0("File ",file," processed at ",Sys.time(),". ",nrow(statoutliers)," potential statistical outlier(s) identified. See QC Log ",paste0(ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
@@ -175,17 +175,17 @@ for (i in 1:nrow(df.qccheck)){
         options(width=10000)
         rangeoutliers <- rangeoutliers %>% arrange(ID)
         statoutliers <- statoutliers %>% arrange(ID)
-        sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+        sink(file = paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
         cat("WIT Quality Control Log\n\n")
         cat(paste0("Data imported at: ",Sys.time(),"\n"))
         cat(paste0("File: ",file,"\n"))
         cat(paste0("Database table: ",ImportTable,"\n\n"))
         cat(paste0(nrow(rangeoutliers)," record(s) outside historical range.\n\n"),append=T)
-        capture.output(print(rangeoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","HistoricalMean","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+        capture.output(print(rangeoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","HistoricalMean","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
         sink()
-        sink(file = paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append = T)
+        sink(file = paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append = T)
         cat(paste0("\n\n",nrow(statoutliers)," potential statistical outlier(s) in imported data.\n\n"),append=T)
-        capture.output(print(statoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(config[28],"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
+        capture.output(print(statoutliers[c("ID","Location","DateTimeET","Parameter","Units","FinalResult","HistoricalMin","Percentile25","HistoricalMedian","Percentile75","HistoricalMax")],print.gap=3,right=F,row.names=F),file=paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"),append=T)
         cat("\n\n")
         sink()
         qc_message <- paste0("File ",file," processed at ",Sys.time(),". ",nrow(rangeoutliers)," record(s) outside historical range and ",nrow(statoutliers)," potential statistical outlier(s) identified. See QC Log ",paste0(ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
