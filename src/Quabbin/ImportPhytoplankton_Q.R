@@ -247,7 +247,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   database <- "DCR_DWSP"
   schema <- "Quabbin"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
   # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
   df_taxa <- dbReadTable(con, Id(schema = "Wachusett", table = "tbl_PhytoTaxa"))
@@ -374,7 +374,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Quabbin'
   tz <- 'America/New_York'
   ### Connect to Database 
-  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
   DBI::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE, row.names =  FALSE)
   

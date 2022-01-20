@@ -24,7 +24,7 @@ dsn <- "DCR_DWSP_App_R"
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  
   ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 
 # Disconnect from db and remove connection obj

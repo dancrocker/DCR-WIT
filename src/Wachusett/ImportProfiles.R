@@ -21,7 +21,7 @@
 # 
 # # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 # ### MN - bring in data streams for testing.
-# datset <- config[8]
+# datset <- config[["Wach Import Datasets"]]
 # files <- readxl::read_xlsx(datset)
 # rawdatafolder <- paste0(files[2,11])
 # file <-  paste0("2021_", files[2,14])
@@ -86,7 +86,7 @@ dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 probes <- dbReadTable(con, Id(schema = schema, table = "tbl_Equipment"))
 df_param <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
@@ -279,7 +279,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  # Get Import Table Columns
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  # Get Import Table Columns
   ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
   
   #assign df.secchi to correct value. NULL if no data, clean record if present

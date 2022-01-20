@@ -72,7 +72,7 @@ dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -363,7 +363,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
   # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
 

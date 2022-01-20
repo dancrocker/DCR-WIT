@@ -85,7 +85,7 @@ dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Quabbin"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 params <- dbReadTable(con,  Id(schema = "Wachusett", table = "tblParameters"))
 
@@ -212,7 +212,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
  schema <- 'Quabbin'
  tz <- 'America/New_York'
 
- con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  # Get Import Table Columns
+ con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  # Get Import Table Columns
  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
 # Disconnect from db and remove connection obj

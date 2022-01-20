@@ -54,7 +54,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   database <- "DCR_DWSP"
   schema <- "Quabbin"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
   df_param <- dbReadTable(con,  Id(schema = "Wachusett", table = "tblParameters"))
   YSI.df$Parameter <- df_param$ParameterName[match(YSI.df$Parameter, df_param$ParameterAbbreviation)]
@@ -162,7 +162,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Quabbin'
   tz <- 'America/New_York'
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)  # Get Import Table Columns
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  # Get Import Table Columns
   ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
   
   # # Set variable types

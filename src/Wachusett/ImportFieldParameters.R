@@ -88,7 +88,7 @@ df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
     database <- "DCR_DWSP"
     schema <- 'Wachusett'
     tz <- 'America/New_York'
-    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
     locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
     flowlocations <- filter(locations, !is.na(LocationFlow))
@@ -124,7 +124,7 @@ UPDATE_IMPORTER_XL <- function() {
   print("Updating Field Parameter Importer excel file ...")
   # Copy the columns into the import template spreadsheet:
   # Open the Workbook and create a workbook object to manipulate
-  wb <- config[24]
+  wb <- config[["Field Parameters Data Path"]]
   wbobj <- loadWorkbook(wb)
 
   # Extract the full data from the sheet
@@ -158,7 +158,7 @@ database <- "DCR_DWSP"
 schema <- 'Wachusett'
 tz <- 'UTC'
 
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 ### Add missing columns ####
 # Get columns from table in db
@@ -394,22 +394,25 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   start <- now()
   print(glue("Starting data import at {start}"))
   # Import the data to the database
-  dsn <- "DCR_DWSP_App_R"
+  dsn <- filename.db
   database <- "DCR_DWSP"
   schema <- "Wachusett"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
   ### Move Field Parameter csv files to the processed data folder ####
   
-  rawYSI <- config[25]
+  rawYSI <- config[["Field Parameters Raw Data Path"]]
   filelist <- list.files(rawYSI,".csv$")
   if (length(filelist) > 0) {
     print("Moving staged field parameter csv files to the imported folder...")
-    filelist2 <- paste0(rawYSI,"/", filelist)
-    file.rename(filelist2, paste0(config[26],"/", filelist))
+    # Move the raw data file to the processed folder ####
+    processed_subdir <- paste0("/", max(year(df.wq$DateTimeUTC))) # Raw data archived by year, subfolders = Year
+    processed_dir <- paste0(processedfolder, processed_subdir)
+    dir.create(processed_dir)
+    file.rename(path, paste0(processed_dir,"/", filelist))
   } else {
     print("There were no csv files associated with this field parameter data")
   }

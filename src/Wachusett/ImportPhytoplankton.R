@@ -106,7 +106,7 @@ database <- "DCR_DWSP"
 dsn <- filename.db
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 # 
 # Get Taxa Table and check to make sure taxa in df.wq are in the Taxa Table - if not warn and exit
 df_taxa_wach <- dbReadTable(con, Id(schema = schema, table = "tbl_PhytoTaxa"))
@@ -226,7 +226,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[35], timezone = tz)# Get Import Table Columns
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)# Get Import Table Columns
 
   ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
 

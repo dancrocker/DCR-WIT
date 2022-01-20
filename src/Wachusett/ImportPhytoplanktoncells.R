@@ -30,7 +30,7 @@
 # scriptname <- "ImportPhytoplanktoncells.R"
 # config <- ### Load Config from local file
 # config <- as.character(config$CONFIG_VALUE)
-# dataset <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) %>%
+# dataset <-  read_excel(config[["Wach Import Datasets"]], sheet = 1, col_names = T, trim_ws = T) %>%
 # filter(ImportMethod == "Importer-R" & ScriptProcessImport == scriptname)
 # # Choose the dataset from options:
 # dataset <- slice(dataset,1)
