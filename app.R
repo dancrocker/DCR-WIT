@@ -1,5 +1,5 @@
 ################################### HEADER ###################################
-#  TITLE: app.R
+#  TITLE: app.R (WIT SHINY APP)
 #  TYPE: Shiny App
 #  DESCRIPTION: This Shiny App contains the "master" script for the Import Data app. The app contains a ui and server component
 #           and sources R scripts from the App folder
@@ -60,7 +60,7 @@ if (userlocation == "Wachusett") {
 # Set user info
 
 user <-  Sys.getenv("USERNAME") %>% toupper()
-userdata <- readxl::read_xlsx(path = paste0(rootdir,config[["Users"]]))
+userdata <- readxl::read_xlsx(path = paste0(wach_team_root, config[["Users"]]))
 userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
@@ -80,7 +80,7 @@ con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connecti
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-if (try(dir.exists(paste0(rootdir, config[["DataCache"]])))) {
+if (try(dir.exists(paste0(wach_team_root, config[["DataCache"]])))) {
   flags <- dbReadTable(con2, Id(schema = "Wachusett", table = "tblFlags")) %>%
     select(-3)
 } else {
@@ -960,7 +960,7 @@ server <- function(input, output, session) {
                 user_profile = FALSE,
                 env = rcmd_safe_env(),
                 timeout = Inf,
-                wd = paste0(rootdir, config[["WAVE-WIT update folder"]]), 
+                wd = paste0(wach_team_root, config[["WAVE-WIT update folder"]]), 
                 fail_on_status = TRUE,
                 color = FALSE
               )
