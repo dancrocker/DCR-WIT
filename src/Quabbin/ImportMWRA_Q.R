@@ -113,7 +113,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   
   ##Separate and export MW data
   df.mw <- df.wq %>% filter(str_detect(Location,"^MW-"))
-  exportpath <- "//env.govt.state.ma.us/enterprise/DCR-Quabbin-WKGRP/EQINSPEC/WQDatabase/data/wqDistributionSystemResults/staging/"
+  User <- Sys.getenv("USERNAME")
+  exportpath <- paste("C:/Users/", User, "/Commonwealth of Massachusetts/DCR-TEAMS-DSWP-QUAB - EQS - DataManagement/Data/wqDistributionSystemResults/staging", sep="")
   fullexportpath <- gsub(" ","",paste (exportpath,"MW_",file))
   write_xlsx(df.mw, fullexportpath) 
   df.wq <- df.wq %>% filter(!str_detect(Location,"^MW-"))
