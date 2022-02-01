@@ -132,7 +132,7 @@ df$DateTimeET <- ifelse(df$Location == "MD04",
                                round_date(df$DateTimeET, "15 minutes"),
                                df$DateTimeET))
 
-df$DateTimeET <- as_datetime(df$DateTimeET) %>% force_tz("America/New_York") 
+df$DateTimeET <- as_datetime(df$DateTimeET) %>% with_tz("America/New_York")
 
 ### Fix location names ####
 df$Location %<>%
