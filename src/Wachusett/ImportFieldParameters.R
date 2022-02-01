@@ -89,7 +89,7 @@ if(sensor =="YSI Pro Plus") {
     pivot_longer(cols = c(2:5), names_to = "Parameter", values_to = "FinalResult") %>% 
     dplyr::rename("Location" = Site, "DateTimeET" = Timestamp, "Probe_ID" = Unit.ID) %>% 
     mutate("Units" = NA_character_, 
-           "Probe_ID" = paste0(sensor," - " , Probe_ID),
+           "Probe_ID" = paste0(sensor," - " , substrRight(Probe_ID, 1)),
            "DateTimeET" = mdy_hm(DateTimeET, tz = "America/New_York")
     )
 } else {
@@ -114,7 +114,7 @@ schema <- 'Wachusett'
 tz <- 'UTC'
 con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
-# Load tblParameters to access abbreviation for Unique ID
+### Load tables from SQL Server ####
 params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
 flowlocations <- filter(locations, !is.na(LocationFlow))
