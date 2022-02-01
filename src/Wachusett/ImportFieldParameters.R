@@ -16,155 +16,135 @@
 # library(tidyverse)
 # library(stringr)
 # library(odbc)
-# library(RODBC)
 # library(DBI)
 # library(magrittr)
 # library(openxlsx)
 # library(DescTools)
 # library(lubridate)
 # library(devtools)
+# library(glue)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
-##############.
-# PREP DATA  #  # Function to Prep Data for use with Import Function
-##############.
-
-PREP_DATA <- function(file){
-
-  ########################################################.
-  # Set system environments (Future - try to set this up to be permanent)
-  Sys.setenv("R_ZIPCMD" = "C:/Rtools/bin/zip.exe")
-  Sys.setenv(PATH = paste("C:/Rtools/bin", Sys.getenv("PATH"), sep=";"))
-  Sys.setenv(BINPREF = "C:/Rtools/mingw_$(WIN)/bin/")
-  # Check system environments
-  # Sys.getenv("R_ZIPCMD", "zip")
-  # Sys.getenv("PATH") # Rtools should be listed now
-  ########################################################.
-
-# Extract the full data from the sheet
-data <- readxl::read_excel(file, sheet = "YSI_Import") %>% 
-  select(-1)
-
-if (nrow(data)==0){
-  # Send warning message to UI
-  stop("There are no records in the file! Make sure there are records and try again.")
-}
-
-expectedcolumns<-c("Source.Name","Timestamp","Specific.Conductance.(uS/cm)","Dissolved.Oxygen.(mg/L)","pH_1.(Units)","Temperature.(C)","Comment","Site","Folder","Unit.ID","Turbidity.(NTU)","Stage.(feet)","Sampled.By")
-
-if (all(colnames(data)!=expectedcolumns)){
-  # Send warning message to UI
-  stop("There are unexpected column names in the file! Check Field Parameter Data Importer and try again.")
-}
-
-
-# Get the data in order and formatted ####
-df <- gather(data, Parameter, FinalResult, c(3:6,11,12), na.rm = T) %>% 
-  select(-c(Folder, `Unit ID`)) %>% 
-  dplyr::rename("Location" = Site, "DataSource" = Source.Name, "SampledBy" = `Sampled By`, "DateTimeET" = Timestamp) %>% 
-  mutate("Units" = NA_character_)
-
-df$Parameter <-  dplyr::recode(df$Parameter, "Dissolved Oxygen (mg/L)" = "Dissolved Oxygen",
-                               "pH_1 (Units)" = "pH",
-                               "Specific Conductance (uS/cm)" = "Specific Conductance",
-                               "Stage (feet)" = "Staff Gauge Height",
-                               "Temperature (C)" = "Water Temperature",
-                               "Turbidity (NTU)" ="Turbidity NTU")
-
-# Create column for units ####
-    
-df$Units <- ifelse(df$Parameter =="Dissolved Oxygen","mg/L",
-                   ifelse(df$Parameter =="pH","pH",
-                          ifelse(df$Parameter =="Specific Conductance","uS/cm",
-                                 ifelse(df$Parameter =="Staff Gauge Height","ft",
-                                        ifelse(df$Parameter == "Water Temperature","Deg-C",
-                                               ifelse(df$Parameter == "Turbidity NTU","NTU", NA
-                                               ))))))
-# Round times ####
-
-    ### Connect to Database   
-    dsn <- "DCR_DWSP_App_R"
-    database <- "DCR_DWSP"
-    schema <- 'Wachusett'
-    tz <- 'America/New_York'
-    con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-
-    locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
-    flowlocations <- filter(locations, !is.na(LocationFlow))
-    
-    df$DateTimeET <- round_date(df$DateTimeET, "minute") 
-    
-    df$DateTimeET <- ifelse(df$Location == "MD04",
-                                round_date(df$DateTimeET, "10 minutes"),
-                                ifelse(df$Location %in% flowlocations$LocationMWRA,
-                                round_date(df$DateTimeET, "15 minutes"),
-                                df$DateTimeET))
-    
-    df$DateTimeET <- as_datetime(df$DateTimeET) %>% force_tz("America/New_York") 
-    dbDisconnect(con)
-    rm(con)
-    
-    ### Fix location names
-    df$Location %<>%
-      gsub("M754","MD75.4",.)
-
-    if (any(!unique(df$Location) %in% locations$LocationMWRA)) {
-      stop("There is at least one location in this data that is not yet recorded in the database. Either remove the record or rename the location to MISC and add result to MISC sample table after import.")
-    }
-# Remove rows with no data value (can happen if one parameter is unable to sampled for example)   
-    # df <- filter(df, !is.na(FinalResult)) ### rm.na added to gather function above, which eliminates empty records
-    
-  print ("Data prep complete...")
-  return(df)  
-} # End PREP DATA Function
-# df <- PREP_DATA(file = paste0(rawdatafolder, "/",file))
-
-UPDATE_IMPORTER_XL <- function() {
-  print("Updating Field Parameter Importer excel file ...")
-  # Copy the columns into the import template spreadsheet:
-  # Open the Workbook and create a workbook object to manipulate
-  wb <- config[["Field Parameters Data Path"]]
-  wbobj <- loadWorkbook(wb)
-
-  # Extract the full data from the sheet
-  data <- readxl::read_excel(wb, sheet = "YSI_Import") %>% 
-    select(-1)
-  # Find the row to paste the data on sheet 2, then copy the data over
-  PasteRow <- as.numeric(NROW(read.xlsx(wb, sheet =  "ImportedToWQDB", colNames = F, cols = 1)) + 1)
-  openxlsx::writeData(wbobj, sheet = 2, data, startCol = 1, startRow = PasteRow, colNames = F)
-  
-  # Find the last row of data to delete on sheet 1, delete the data, then save the workbook
-  EndRow <- NROW(data) + 2
-  openxlsx::deleteData(wbobj, sheet = 1, cols = 2:14, rows = 2:EndRow, gridExpand = T)
-  openxlsx::saveWorkbook(wbobj, wb, overwrite = TRUE)
-  print("Finished updating Field Parameter Importer excel file")
-}
-
-#   PROCESSING FUNCTION    #
-############################.
-
+########################################################################.
+###                          PROCESS DATA                  ####
+########################################################################.
+# NOTE: file is just filename, not full path
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL){ # Start the function - takes 1 input (File)
 
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
 # Path to raw data file
-path <- paste0(rawdatafolder,"/", file)
-# Prep the raw data - send to importer worksheet
-df <- PREP_DATA(file = path)
+filepath <- paste0(rawdatafolder,"/", file)
 
-# Connect to db for queries below
+substrRight <- function(x, n){
+  substr(x, nchar(x)-n+1, nchar(x))
+}
+
+pro_plus_header <- c("Timestamp", 
+                     "Specific.Conductance..uS.cm.", 
+                     "Dissolved.Oxygen..mg.L.",
+                     "pH_1..Units.",                 
+                     "Temperature..C.",
+                     "Comment",
+                     "Site",                         
+                     "Folder",                       
+                     "Unit.ID",
+                     "SampledBy")
+
+pro_quatro_header <- c("Date",
+                       "Time",
+                       "DataID",	
+                       "Temp.C.",	
+                       "DO..L.",	
+                       "DO.mg.L.",	
+                       "SPC.uS.cm.",
+                       "pH",	
+                       "Probe_ID",	
+                       "SampledBy")
+
+
+### Read File ####
+
+data <- read.csv(filepath)
+
+### Determine which filetype is in the csv ####
+if(all(names(data) %in% pro_plus_header)) {
+  print("Data is from a YSI Pro Plus device...")
+  sensor <- "YSI Pro Plus" 
+}  else {
+  if(all(names(data) %in% pro_quatro_header)) {
+    print("Data is from a YSI Pro Quatro device...")
+    sensor <- "YSI Pro Quatro"
+  } else {
+    stop("Data header format unexpected. Please check that the necessary 'Probe_ID' and 'SampleBy' columns exist in the selected file")
+  }
+}
+
+if(sensor =="YSI Pro Plus") {
+  ### Format Pro Plus Data ####
+  names(data)[2:5] <- c("Specific Conductance", "Dissolved Oxygen", "pH", "Water Temperature")
+  
+  df <- data %>% 
+    select(-c(Folder, Comment)) %>%
+    pivot_longer(cols = c(2:5), names_to = "Parameter", values_to = "FinalResult") %>% 
+    dplyr::rename("Location" = Site, "DateTimeET" = Timestamp, "Probe_ID" = Unit.ID) %>% 
+    mutate("Units" = NA_character_, 
+           "Probe_ID" = paste0(sensor," - " , Probe_ID),
+           "DateTimeET" = mdy_hm(DateTimeET, tz = "America/New_York")
+    )
+} else {
+  ### Format Pro Quatro Data #### 
+  names(data)[4:8] <- c("Water Temperature", "Oxygen Saturation", "Dissolved Oxygen", "Specific Conductance", "pH")
+  
+  df <- data %>% 
+    pivot_longer(cols = c(4:8), names_to = "Parameter", values_to = "FinalResult") %>% 
+    dplyr::rename("Location" = DataID) %>%
+    mutate("Units" = NA_character_, 
+           "Location" = substrRight(Location, 4),
+           "Probe_ID" = paste0(sensor," - " , Probe_ID),
+           "DateTimeET" = mdy_hms(paste(Date, Time, sep = " "), tz = "America/New_York")
+    ) %>% 
+    select(-c("Date", "Time"))
+}
+
+### Connect to Database ####  
 dsn <- "DCR_DWSP_App_R"
 database <- "DCR_DWSP"
 schema <- 'Wachusett'
 tz <- 'UTC'
-
 con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+
+# Load tblParameters to access abbreviation for Unique ID
+params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
+locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
+flowlocations <- filter(locations, !is.na(LocationFlow))
+ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
+
+### Populate Units Column ####
+df$Units <- params$ParameterUnits[match(df$Parameter, params$ParameterName)]
+
+### Round Times ####
+df$DateTimeET <- round_date(df$DateTimeET, "minute") 
+
+df$DateTimeET <- ifelse(df$Location == "MD04",
+                        round_date(df$DateTimeET, "10 minutes"),
+                        ifelse(df$Location %in% flowlocations$LocationMWRA,
+                               round_date(df$DateTimeET, "15 minutes"),
+                               df$DateTimeET))
+
+df$DateTimeET <- as_datetime(df$DateTimeET) %>% force_tz("America/New_York") 
+
+### Fix location names ####
+df$Location %<>%
+  gsub("M754","MD75.4",.)
+
+if (any(!unique(df$Location) %in% locations$LocationMWRA)) {
+  stop("There is at least one location in this data that is not yet recorded in the database. Either remove the record or rename the location to MISC and add result to MISC sample table after import.")
+}
 
 ### Add missing columns ####
 # Get columns from table in db
 cols <- dbListFields(con, schema_name = schema, name = "tblTribFieldParameters")
-# Load tblParameters to access abbreviation for Unique ID
-params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 
 # Add the ones that are missing
 for (col in cols) {
@@ -175,12 +155,6 @@ for (col in cols) {
 ### Order columns to match db ####
 
 df <- df[,cols]
-
-if(identical(names(df), cols)) {
-  print("Dataframe columns match...ready to proceed...")
-} else {
-  stop("Columns of the dataframe do not match data")
-}
 
 ####################################.
 #  START REFORMATTING THE DATA  ####
@@ -202,8 +176,6 @@ df$UniqueID <- paste(df$Location, format(df$DateTimeET, format = "%Y-%m-%d %H:%M
 #############################.
 #   Calculate Discharges ####
 #############################.
-
-ratings <- dbReadTable(con, Id(schema = schema, table = "tblRatings"))
 
 ToCalc <- dplyr::filter(df, Location %in% ratings$MWRA_Loc[ratings$IsCurrent == TRUE], Parameter == "Staff Gauge Height")
 
@@ -248,7 +220,7 @@ if (length(dupes2) > 0){
 rm(Uniq)
 
 ### DataSource ####
-df$DataSource <-  paste0("Field_Parameters_", min(as_date(df$DateTimeET)),"_", max(as_date(df$DateTimeET)))
+df$DataSource <- file
 
 ### DataSourceID ####
 # Do some sorting first:
@@ -367,7 +339,7 @@ print(qc_message)
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df
-dfs[[2]] <- path
+dfs[[2]] <- filepath
 dfs[[3]] <- df.flags
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
@@ -377,46 +349,38 @@ return(dfs)
 
 #### COMMENT OUT WHEN RUNNING SHINY ##############
 #
-            # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
+            # # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
             # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL)
-            # 
-            # # Extract each element needed
+            # # # Extract each element needed
             # df     <- dfs[[1]]
             # path  <- dfs[[2]]
-
+            # df.flags  <- dfs[[3]]
 ##################################################.
 
 ############################.
 # Write data to Database ####
 ############################.
-
-IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,processedfolder, ImportTable, ImportFlagTable = NULL){
+# NOTE: file is just the filename, path = full path to file
+IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db , processedfolder, ImportTable, ImportFlagTable = NULL){
   start <- now()
   print(glue("Starting data import at {start}"))
-  # Import the data to the database
-  dsn <- filename.db
+  ### Connect to Database   
+  dsn <- "DCR_DWSP_App_R"
   database <- "DCR_DWSP"
-  schema <- "Wachusett"
+  schema <- 'Wachusett'
   tz <- 'America/New_York'
   con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-
+ 
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
   ### Move Field Parameter csv files to the processed data folder ####
+  print("Moving staged field parameter csv files to the imported folder...")
+  # Move the raw data file to the processed folder ####
+  processed_subdir <- paste0("/", max(year(df.wq$DateTimeUTC))) # Raw data archived by year, subfolders = Year
+  processed_dir <- paste0(processedfolder, processed_subdir)
+  dir.create(processed_dir)
+  file.rename(path, paste0(processed_dir,"/", file))
   
-  rawYSI <- config[["Field Parameters Raw Data Path"]]
-  filelist <- list.files(rawYSI,".csv$")
-  if (length(filelist) > 0) {
-    print("Moving staged field parameter csv files to the imported folder...")
-    # Move the raw data file to the processed folder ####
-    processed_subdir <- paste0("/", max(year(df.wq$DateTimeUTC))) # Raw data archived by year, subfolders = Year
-    processed_dir <- paste0(processedfolder, processed_subdir)
-    dir.create(processed_dir)
-    file.rename(path, paste0(processed_dir,"/", filelist))
-  } else {
-    print("There were no csv files associated with this field parameter data")
-  }
-
     # Flag data
   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
@@ -428,7 +392,6 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db ,proces
   dbDisconnect(con)
   rm(con)
   
-  UPDATE_IMPORTER_XL()
   end <- now()
   return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
  }
