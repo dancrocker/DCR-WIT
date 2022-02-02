@@ -15,7 +15,6 @@
 #             library(tidyverse)
 #             library(stringr)
 #             library(odbc)
-#             library(RODBC)
 #             library(DBI)
 #             library(readxl)
 #             library(lubridate)
@@ -23,100 +22,79 @@
 #             library(openxlsx)
 #             library(data.table)
 
-
-##############
-# PREP DATA  #  This function combines all of the preliminary bacteria csv files into 1 xlsx file
-##############
-
-PREP_DATA <- function(rawdatafolder){
-
-#These variables are the same as what is listed in datasets.xlsx
-rawdatafolder <- rawdatafolder
-
-### Generate a list of the preliminary data files:
-filelist <- grep(
-  x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-  pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
-  value = T,
-  perl =T)
-
-# Add the path to each file and save as a new list
-filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
 ###################################################################################################
 # Set system environments (Future - try to set this up to be permanent)
 # Without setting these envs the openxlsx saveWorkbook fn cannot zip the file and save it
-          Sys.setenv("R_ZIPCMD" = "C:/Rtools/bin/zip.exe")
-          Sys.setenv(PATH = paste("C:/Rtools/bin", Sys.getenv("PATH"), sep=";"))
-          Sys.setenv(BINPREF = "C:/Rtools/mingw_$(WIN)/bin/")
-          # Check system environments
-          # Sys.getenv("R_ZIPCMD", "zip")
-          # Sys.getenv("PATH") # Rtools should be listed now
+
+Sys.setenv("R_ZIPCMD" = "C:/rtools40/usr/bin/zip.exe")
+Sys.setenv(PATH = paste("C:/rtools40/usr/bin", Sys.getenv("PATH"), sep=";"))
+Sys.setenv(BINPREF = "C:/rtools40/mingw$(WIN)/usr/bin/")
+
+# Check system environments
+# Sys.getenv("R_ZIPCMD", "zip")
+# Sys.getenv("PATH") # Rtools should be listed now
 ###################################################################################################
-# Read in all preliminary files and combine into 1
-tables <- lapply(filelist2, read.csv, header = TRUE)
-#a <-  tables[[3]]
-
-# Combine files
-combined.df <- rbindlist(tables)
-# mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
-
-# Filter out unneeded columns and save to new df
-df.wq <- combined.df[, -c(16,18:22,24:25)]
-# Rename Columns to match existing format
-names(df.wq) = c("SampleGroup",
-                 "Location",
-                 "Description",
-                 "TripNum",
-                 "LabRecDate",
-                 "SampleDate",
-                 "SampleTime",
-                 "PrepOn",
-                 "DateTimeAnalyzed",
-                 "AnalyzedBy",
-                 "Analysis",
-                 "Parameter",
-                 "ResultReported",
-                 "Units",
-                 "Comment",
-                 "SampledBy",
-                 "Status")
-# Add missing variables:
-
-                 df.wq$TextID <-  ""
-                 df.wq$ReportedName <-  ""
-                 df.wq$SampleNumber <-  ""
-                 df.wq$EDEP_Confirm <-  ""
-                 df.wq$EDEP_MW_Confirm <-  ""
-                 df.wq$Reportable <-  ""
-                 df.wq$Method <-  ""
-                 df.wq$DetectionLimit <-  ""
-
-# Create a workbook object and add df.wq to it - save over the older workbook
-
-      wb <- paste0(rawdatafolder,"/PrelimBacteria.xlsx")
-      wbobj <- createWorkbook(wb)
-      addWorksheet(wbobj, "Sheet 1")
-      writeData(wbobj, sheet = 1, df.wq, colNames = T)
-# Save the workbook and then proceed (This will overwrite the existing file)
-saveWorkbook(wbobj, wb, overwrite = TRUE)
-} # End PREP DATA FUNCTION
 
 #############################
 #   PROCESSING FUNCTION    #
 ############################
 PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable){
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
-# Get the full path to the file
-
-PREP_DATA(rawdatafolder = rawdatafolder)
+  
+  ### Generate a list of the preliminary data files:
+  filelist <- grep(
+    x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
+    pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
+    value = T,
+    perl =T)
+  
+  # Add the path to each file and save as a new list
+  filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
+  
+  # Read in all preliminary files and combine into 1
+  tables <- lapply(filelist2, read.csv, header = TRUE)
+  
+  # Combine files
+  combined.df <- rbindlist(tables)
+  # mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
+  
+  # Filter out unneeded columns and save to new df
+  df.wq <- combined.df[, -c(16,18:22,24:25)]
+  
+  # Rename Columns to match existing format
+  names(df.wq) = c("SampleGroup",
+                   "Location",
+                   "Description",
+                   "TripNum",
+                   "LabRecDateET",
+                   "SampleDate",
+                   "SampleTime",
+                   "PrepOnET",
+                   "DateTimeAnalyzedET",
+                   "AnalyzedBy",
+                   "Analysis",
+                   "Parameter",
+                   "ResultReported",
+                   "Units",
+                   "Comment",
+                   "SampledBy",
+                   "Status")
+  
+  # Add missing variables:
+  
+  df.wq$TextID <-  NA_character_
+  df.wq$ReportedName <-  NA_character_
+  df.wq$SampleNumber <-  NA_character_
+  df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
+  df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
+  df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_MW_Confirm)
+  df.wq$Reportable <- NA_character_
+  df.wq$Method <-  NA_character_
+  df.wq$DetectionLimit <- NA_character_
+  df.wq$Comment <- as.character(df.wq$Comment)
+  df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
   path <- paste0(rawdatafolder,"/", file)
-  # file <- "PrelimBacteria.xlsx"
-# Read in the data to a dataframe
-df.wq <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
-  as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
-df.wq <- df.wq[,c(1:25)]
-### Perform Data checks ###
 
 # At this point there could be a number of checks to make sure data is valid
   # Check to make sure there are 25 variables (columns)
@@ -139,35 +117,48 @@ df.wq <- df.wq[,c(1:25)]
     stop("There are unspecified (MISC) locations that need to be corrected before importing data")
   }
 
-
 ### OTHER MESSAGES AND WARNINGS:
 # "All MISC sample locations were automatically converted to location MD75.4
 #-- If other miscellaneous Locations were part of this datset they should be corrected prior to importing data to database
 
 # Connect to db for queries below
-con <- dbConnect(odbc::odbc(),
-                 .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-                                            paste0("DBQ=", filename.db), "Uid=Admin;Pwd=;", sep = ";"),
-                 timezone = "America/New_York")
+### Connect to Database   
+dsn <- filename.db
+database <- "DCR_DWSP"
+schema <- "Wachusett"
+tz <- 'America/New_York'
+con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 #################################
 #  START REFORMATTING THE DATA  #
 #################################
 
-### Date and Time:
-df.wq$SampleDate <- mdy(df.wq$SampleDate)
+# Merge the actual date column with the new Time Column and reformat to POSIXct
+df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%m/%d/%Y"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
-# SampleDateTime
-# Merge the date column with the Time Column and reformat to POSIXct
-df.wq$SampleDateTime <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$SampleTime, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+# Fix all other date-time cols
+if(all(!is.na(df.wq$LabRecDateET))) {
+  df.wq$LabRecDateET <- parse_date_time(df.wq$LabRecDateET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$LabRecDateET <- as_datetime(df.wq$LabRecDateET)
+}
 
-# Fix other data types
-df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
-df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
-df.wq$Comment <- as.character(df.wq$Comment)
+if(all(!is.na(df.wq$PrepOnET))) {
+  df.wq$PrepOnET <- parse_date_time(df.wq$PrepOnET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$PrepOnET <- as_datetime(df.wq$PrepOnET)
+}
+
+if(all(!is.na(df.wq$DateTimeAnalyzedET))) {
+  df.wq$DateTimeAnalyzedET <- parse_date_time(df.wq$DateTimeAnalyzedET, orders = "mdyHMS" , tz = "America/New_York")
+} else {
+  df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
+}
+
+
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-params <- dbReadTable(con,"tblParameters")
+params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
@@ -184,9 +175,9 @@ df.wq$Location %<>%
 #   Add new Columns  #
 ######################
 
-### Unique ID number
-df.wq$UniqueID <- ""
-df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$SampleDateTime, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
+### Unique ID number ####
+df.wq$UniqueID <- NA_character_
+df.wq$UniqueID <- paste(df.wq$Location, format(df.wq$DateTimeET, format = "%Y-%m-%d %H:%M"), params$ParameterAbbreviation[match(df.wq$Parameter, params$ParameterName)], sep = "_")
 
 ## Make sure it is unique within the data file - if not then exit function and send warning
 dupecheck <- which(duplicated(df.wq$UniqueID))
@@ -200,7 +191,7 @@ if (length(dupes) > 0){
 }
 ### Make sure records are not already in DB
 
-Uniq <- dbGetQuery(con,"SELECT UniqueID FROM tblWQALLDATA")
+Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
 dupes2 <- Uniq$UniqueID[Uniq$UniqueID %in% df.wq$UniqueID]
 
 if (length(dupes2) > 0){
@@ -212,10 +203,12 @@ if (length(dupes2) > 0){
 rm(Uniq)
 
 ### DataSource
-df.wq <- df.wq %>% mutate(DataSource = paste("MWRA", file,today(), sep = "_"))
+df.wq <- df.wq %>% mutate(DataSource = paste("MWRA_Preliminary_Results",today(), sep = "_"),
+                          Imported_By = username,
+                          QAQC_By = NA_character_)
 ### DataSourceID
 # Do some sorting first:
-df.wq <- df.wq[with(df.wq, order(SampleDateTime, Location, Parameter)),]
+df.wq <- df.wq[with(df.wq, order(DateTimeET, Location, Parameter)),]
 
 # Assign the numbers
 df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
@@ -230,6 +223,17 @@ edits <- str_detect(df.wq$ResultReported, paste(c("<",">"), collapse = '|')) %>%
 update <- as.numeric(df.wq$ResultReported[-edits], digits = 6)
 df.wq$ResultReported[-edits] <- as.character(update)
 
+# Add new column for censored data
+df.wq <- df.wq %>%
+  mutate("IsCensored" = NA_integer_)
+
+if(length(edits) == 0) {
+  df.wq$IsCensored <- FALSE
+} else {
+  df.wq$IsCensored[edits] <- TRUE
+  df.wq$IsCensored[-edits] <- FALSE
+}
+
 ### FinalResult (numeric)
 # Make the variable
 df.wq$FinalResult <- NA
@@ -238,7 +242,7 @@ x <- df.wq$ResultReported
 # Function to determine FinalResult
 FR <- function(x) {
   if(str_detect(x, "<")){# BDL
-    as.numeric(gsub("<","", x), digits = 4) * 0.5 # THEN strip "<" from reported result, make numeric, divide by 2.
+    as.numeric(gsub("<","", x), digits = 4) # THEN strip "<" from reported result, make numeric
   } else if (str_detect(x, ">")){
     as.numeric(gsub(">","", x)) # THEN strip ">" form reported result, make numeric.
   } else {
@@ -265,16 +269,16 @@ df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
   # df.wq$StormSample <- 0 %>%  as.numeric()
 
 ### Storm SampleN (numeric)
-df.wq$StormSampleN <- NA %>% as.character()
+df.wq$StormSampleN <- NA_character_
 
 ### Importdate (Date)
-df.wq <- df.wq %>% mutate(ImportDate = today())
+df.wq$ImportDate <- Sys.Date() %>% force_tz("America/New_York")
 
 #####################################################################
 
 ### IDs
 setIDs <- function(){
-  query.wq <- dbGetQuery(con, "SELECT max(ID) FROM tblWQALLDATA")
+  query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
   # Get current max ID
   if(is.na(query.wq)) {
     query.wq <- 0
@@ -293,7 +297,7 @@ df.wq$ID <- setIDs()
 
 setFlagIDs <- function(){
 
-  query.flags <- dbGetQuery(con,"SELECT max(ID) FROM tblTribFlagIndex")
+  query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
   # Get current max ID
   if(is.na(query.flags)) {
     query.flags <- 0
@@ -305,11 +309,11 @@ setFlagIDs <- function(){
 
   # Generate flags for above/below detection records
   df.flag1 <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID) %>%
+    rename("SampleID" = ID) %>%
     drop_na()
   # Generate flags for every record indicating that it is a preliminary record = 102
   df.flag2 <- as.data.frame(select(df.wq,c("ID","FlagCode"))) %>%
-    rename("SampleFlag_ID" = ID)
+    rename("SampleID" = ID)
   df.flag2$FlagCode <- 102
   # Merge the two flag dfs into 1
   df.flags <- rbind(df.flag1, df.flag2)
@@ -317,11 +321,12 @@ setFlagIDs <- function(){
   ### ID flags
   df.flags$ID <- seq.int(nrow(df.flags)) + ID.max.flags
   df.flags$DataTableName <- ImportTable
-  df.flags$DateFlagged = today()
+  df.flags$DateFlagged <-  Sys.Date() %>% force_tz("America/New_York")
   df.flags$ImportStaff = Sys.getenv("USERNAME")
+  df.flags$Comment <- "Flag automatically added at import"
 
   # Reorder df.flags columns to match the database table exactly # Add code to Skip if no df.flags
-  df.flags <- df.flags[,c(3,4,1,2,5,6)]
+  df.flags <- df.flags[,c(3,4,1,2,5,6,7)]
 } # End set flags function
 df.flags <- setFlagIDs()
 
@@ -339,8 +344,8 @@ df.wq <- df.wq %>% select(-c(Description,
 )
 
 # Reorder remaining 32 columns to match the database table exactly
-col.order.wq <- dbListFields(con, "tblWQALLDATA")
-df.wq <-  df.wq[,col.order.wq]
+col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
+df.wq <-  df.wq %>% select(all_of(col.order.wq))
 
 
 # Create a list of the processed datasets
@@ -371,29 +376,33 @@ return(dfs)
 # Write data to Database #
 ##########################
 
-IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
 
-# This is preliminary data, so it shouldn't be in the database yet
-  # Connect to db using ODBC
-  con <-  odbcConnectAccess(filename.db)
-
-  # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
-
-  # WQ Data
-  ColumnsOfTable <- sqlColumns(con, "tblWQALLDATA")
-  varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  sqlSave(con, df.wq, tablename = "tblWQALLDATA", append = T,
-          rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-  # Flag data - must have flags since this is preliminary data
-    sqlSave(con, df.flags, tablename = "tblTribFlagIndex", append = T,
-            rownames = F, colnames = F, addPK = F , fast = F)
-
+  start <- now()
+  print(glue("Starting data import at {start}"))
+  ### CONNECT TO DATABASE ####
+  ### Set DB
+  dsn <- filename.db
+  database <- "DCR_DWSP"
+  schema <- 'Wachusett'
+  tz <- 'America/New_York'
+  ### Connect to Database 
+  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
+  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+  
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+  } else {
+    print("There were no flags to import")
+  }
+  
   # Disconnect from db and remove connection obj
-  odbcCloseAll()
+  dbDisconnect(con)
   rm(con)
 
-  #Move Preliminary csv files to the processed data folder
+  # Move Preliminary csv files to the processed data folder
   rawdatafolder <- str_sub(path, 1, nchar(path) - 20)
   filelist <- grep(
     x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
@@ -402,8 +411,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     perl =T)
 
   filelist2 <- paste0(rawdatafolder,"/", filelist)
-  file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/", filelist))
-  return("Import Successful")
+  ### Create the destination directory if it does not yet exist ####
+  sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
+  file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))
+  end <- now()
+  print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds"))  
 }
 ### END
 #IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable)

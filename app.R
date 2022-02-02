@@ -1,5 +1,5 @@
 ################################### HEADER ###################################
-#  TITLE: app.R
+#  TITLE: app.R (WIT SHINY APP)
 #  TYPE: Shiny App
 #  DESCRIPTION: This Shiny App contains the "master" script for the Import Data app. The app contains a ui and server component
 #           and sources R scripts from the App folder
@@ -22,81 +22,79 @@ print(paste0("WIT App lauched at ", Sys.time()))
 
 ### Load packages
 
-ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[15])[, "Package"])]
-  if (length(new.pkg))
-    install.packages(new.pkg, lib = config[15], dependencies = TRUE, repos="http://cran.rstudio.com/")
-  sapply(pkg, require, character.only = TRUE)
+if (!"RDCOMClient" %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"]) {
+  print("RDCOMClient Package not found in library. Installing now...")
+  devtools::install_github("BSchamberger/RDCOMClient")
 }
-
-packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "RODBC", "odbc", "DBI", "lubridate",
-              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "testthat", "glue", "httr", "DT", "rdrop2", "callr")
-
 # install.packages("RDCOMClient", repos = "http://www.omegahat.net/R") # This install fails for some people - not sure why
 # Envoke package update every so often to update packages
 # update.packages(lib.loc = config[15] , repos ="http://cran.rstudio.com/", oldPkgs = c(packages, "dplyr"), ask = F)
 
+
+ipak <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"])]
+  if (length(new.pkg))
+    install.packages(new.pkg, lib = config[["R_lib_Path"]], dependencies = TRUE, repos="http://cran.rstudio.com/")
+  sapply(pkg, require, character.only = TRUE)
+}
+
+packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "odbc", "DBI", "lubridate",
+              "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi", "RDCOMClient")
+
 # Load-Install Packages
 ipak(packages)
 
-library(RDCOMClient)
- 
-
 source("src/Functions/outlook_email.R", local = T)
-
-# Set user info
-user <-  Sys.getenv("USERNAME") %>% toupper()
-userdata <- readxl::read_xlsx(path = config[17])
-userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
-username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
-useremail <- userinfo$Email[1]
-userlocation <- userinfo$Location[1]
-schema <- userlocation
-# Specify mail server
-MS <- config[5]
-
-### Connect to Database  
-### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
-# database <- 'DCR_DWSP'
-# tz <- 'America/New_York'
-# con2 <- dbConnect(odbc::odbc(), database, timezone = tz)
-  
-
-con2 <- dbConnect(odbc::odbc(),
-        .connection_string = paste("driver={Microsoft Access Driver (*.mdb)}",
-        paste0("DBQ=", config[3]), "Uid=Admin;Pwd=;", sep = ";"), timezone = "America/New_York")
-
 
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
-  datasets <-  read_excel(config[8], sheet = 1, col_names = T, trim_ws = T) 
+  rootdir <- wach_team_root
+  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) 
 } else {
-  if (userlocation == "Quabbin") {
-    datasets <-  read_excel(config[9], sheet = 1, col_names = T, trim_ws = T) %>%
+  rootdir <- quab_team_root
+  datasets <-  read_excel(paste0(quab_team_root, config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
     filter(ImportMethod == "Importer-R")
-  } else {
-    datasets <-  read_excel(config[10], sheet = 1, col_names = T, trim_ws = T) %>% # This is a placeholder for BK forestry data... to be deprecated
-      filter(ImportMethod == "Importer-R")
-  }
 }
+
+# Set user info
+
+user <-  Sys.getenv("USERNAME") %>% toupper()
+userdata <- readxl::read_xlsx(path = paste0(wach_team_root, config[["Users"]]))
+userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
+username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
+useremail <- userinfo$Email[1]
+# userlocation <<- userinfo$Location[1]
+usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
+schema <<- userlocation
+# Specify mail server
+# MS <- config[5]
+
+### Connect to Database  
+### Once everyone is on SQL Server, switch over to reading table from there This connection is only used to get the flag table
+
+dsn <- 'DCR_DWSP_App_R'
+database <- "DCR_DWSP"
+tz <- 'America/New_York'
+con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-if (try(file.access(config[1], mode = 4)) == 0) {
-  # flags <- dbReadTable(con2, Id(schema = schema, table = "tblFlags")) %>%
-  flags <- dbReadTable(con2, "tblFlags") %>%
+if (try(dir.exists(paste0(wach_team_root, config[["DataCache"]])))) {
+  flags <- dbReadTable(con2, Id(schema = "Wachusett", table = "tblFlags")) %>%
     select(-3)
-  flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
-  
+} else {
+  print("Data cache unavailable")
   ### Get df Flags from Dropbox rds files
-  df_flags_url <- config[30]
-  datadir <- paste0(getwd(), "/rds_files")
-  dir.create(file.path(datadir), showWarnings = FALSE)
-  GET(df_flags_url, 
-      write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
-  flags <- read_rds(paste0(datadir, "/df_flags.rds"))
+#   df_flags_url <- config[["df_flags.rds_dropbox_url"]]
+#   datadir <- paste0(getwd(), "/rds_files")
+#   dir.create(file.path(datadir), showWarnings = FALSE)
+#   GET(df_flags_url, 
+#       write_disk(paste0(datadir, "/df_flags.rds"), overwrite = T))
+#   flags <- read_rds(paste0(datadir, "/df_flags.rds"))
 }
+
+flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
 
 ### Get df Paramaeters from Dropbox rds files
 # df_wach_params_url <- config[31]
@@ -259,9 +257,18 @@ ui <- tagList(
                                   ) # End Well Panel
                             )# End Column
                         ), # End Fluid Row
+                        fluidRow(column(12,
+                                        wellPanel(
+                                          strong(h4("4. Add comment to apply to these flagged records (Optional):")),
+                                          uiOutput("AddComment.UI"),
+                                          textOutput("E"),
+                                          br()
+                                        )
+                                )
+                        ),
                         fluidRow(column(6,
                                     wellPanel(
-                                      strong(h4("4. Prepare flag data for import:")),
+                                      strong(h4("5. Prepare flag data for import:")),
                                       br(),
                                       uiOutput("processflags.UI"),
                                       br(),
@@ -272,7 +279,7 @@ ui <- tagList(
                                 ),
                                 column(6,
                                     wellPanel(
-                                      strong(h4("6. Import flag data :")),
+                                      strong(h4("7. Import flag data :")),
                                       br(),
                                       uiOutput("importFlags.UI"),
                                       br(),
@@ -281,7 +288,7 @@ ui <- tagList(
                                 )
                         ),
                         fluidRow(column(12,
-                                        strong(h4("5. Preview flag data before import:")),
+                                        strong(h4("6. Preview flag data before import:")),
                                           # tableOutput("previewtable"),
                                           DT::dataTableOutput("table.manual.flag"),
                                           br()
@@ -315,7 +322,7 @@ server <- function(input, output, session) {
   })
   rawdatafolder <- reactive({
     req(ds())
-    ds()$RawFilePath[1]
+    paste0(rootdir, ds()$RawFilePath[1])
   })
   ImportTable <- reactive({
     req(ds())
@@ -327,7 +334,7 @@ server <- function(input, output, session) {
   })
   processedfolder <- reactive({
     req(ds())
-    ds()$ProcessedFilePath[1]
+    paste0(rootdir, ds()$ProcessedFilePath[1])
   })
 
   filename.db <- reactive({
@@ -346,7 +353,7 @@ server <- function(input, output, session) {
 
 ### FILE SELECTION ####
 
-  # Make the File List
+  # Make the File List (NOT FULL PATHS!)
   files <- eventReactive(rawdatafolder() ,{
     grep(x = list.files(rawdatafolder(), ignore.case = T, include.dirs = F),
          # pattern = "^(?=.*\\b(.xlsx|.xlsm)\\b)(?!.*\\$\\b)", # regex to show xlsx files, but filter out lockfiles string = "$"
@@ -423,13 +430,14 @@ server <- function(input, output, session) {
         })
   
   unmatchedtimes  <- reactive({
+    req(dfs())
     req(ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
          dfs()[[4]]
         })
   
   ### Import Email Message ####
   qcpath <- reactive({
-    paste0("file:///", str_replace_all(config[28],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
+    paste0("file:///", str_replace_all(config[["QC_Logfiles"]],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
   })
   reactive_emailmsg <- reactiveVal(
     ""
@@ -438,7 +446,7 @@ server <- function(input, output, session) {
     ""
   )  
   observeEvent(input$import, {
-    if(file.exists(paste0(config[28],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+    if(file.exists(paste0(config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
       reactive_emailmsg(
         paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p>
                <p>Warning: Quality control outliers found in imported data. See QC Log <a href=",qcpath(),">",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
@@ -602,7 +610,7 @@ server <- function(input, output, session) {
       #          control=list(smtpServer=MS))
     
       error=function(cond) {
-        message(paste("User cannot connect to SMTP Server, cannot send email", cond))
+        message(paste("There was an error trying to send the email", cond))
         return(1)
       },
       warning=function(cond) {
@@ -610,7 +618,7 @@ server <- function(input, output, session) {
         return(2)
       },
       finally={
-        message(paste("Email notification attempted"))
+        message(paste("Email notification attempt completed"))
       }
     )
     return(out)
@@ -644,12 +652,11 @@ server <- function(input, output, session) {
   
   output$table.process.wq <- DT::renderDataTable({
     req(try(df.wq()))
-    if ("SampleDateTime" %in% names(df.wq())) {
+    if ("DateTimeET" %in% names(df.wq())) {
       datatable(df.wq()) %>%
-        formatDate(columns = c("SampleDateTime"), method = 'toLocaleString')
+        formatDate(columns = c("DateTimeET"), method = 'toLocaleString')
     } else {
-      datatable(df.wq()) %>% 
-        formatDate(columns = c("SampleDate"), method = 'toLocaleString')
+      datatable(df.wq()) 
     }
   })
 
@@ -684,10 +691,14 @@ server <- function(input, output, session) {
     req(input$flag)
     as.numeric(substr(input$flag, 1, 3))
     })
-
   distro2 <- reactive({
-    # req(dsflags())
+    req(dsflags())
     as.character(dsflags()$EmailList[1])
+  })
+  
+  flagComment <- reactive({
+    req(input$FlagComment)
+    paste0("Comment for flagged records: ", input$FlagComment)
   })
   
   rds_updates2 <- reactive({
@@ -732,6 +743,14 @@ server <- function(input, output, session) {
     combined <- lapply(x, function(x) x[!is.na(x)])
     flagRecords <- unique(Reduce(c,combined))
   })
+  
+  flagComment <- reactive({
+    if(isTruthy(input$flag_comment)) {
+      input$flag_comment %>% str_squish() %>% strtrim(150)
+    } else {
+      NA_character_
+    }
+  })
 
   # Preview each output
   output$A <- renderText({
@@ -753,9 +772,25 @@ server <- function(input, output, session) {
       req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
       paste0(length(flagRecords()), " records have been marked for flagging: ", list(flagRecords()))
     })
+  
+  output$E <- renderText({
+    req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
+    req(isTruthy(input$flag_comment))
+    glue("Comment for flagged records: {input$flag_comment %>% str_squish() %>% strtrim(150)}")
+  })
 
   ### PROCESS FLAGS ####
-
+  
+  ### FLAG COMMENT ####
+  
+  output$AddComment.UI <- renderUI({
+    req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
+    textInput(inputId = "flag_comment", 
+              label = "",
+              placeholder = "Max 150 characters",
+              width = "100%")
+  })
+  
   ### PROCESS MANUAL FLAGS UI ####
   output$processflags.UI <- renderUI({
     req(isTruthy(input$flagsA) | isTruthy(input$flagsB1) & isTruthy(input$flagsB2) | isTruthy(input$flagsC))
@@ -767,8 +802,10 @@ server <- function(input, output, session) {
    ### PROCESS FLAGS BUTTON ####
   df.manualflags <- eventReactive(input$processflags, {
     showModal(busyModal(msg = "Processing flags..."))
-    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T) # Hopefully this will overwrite functions as source changes...needs more testing
-    df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords())
+    source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
+    df.manualflags <- PROCESS_DATA(flag.db = flag.db() , datatable = datatable2(), 
+                                   flagtable = flagtable(), flag = flagSelected(), flagRecords = flagRecords(), 
+                                   comment = flagComment(), usertype = usertype, userlocation = userlocation)
     removeModal()
     return(df.manualflags)
      })
@@ -795,7 +832,7 @@ server <- function(input, output, session) {
     source(paste0(getwd(), "/src/", userlocation, "/ImportManualFlags.R"), local = T)
     out <- tryCatch(IMPORT_DATA(flag.db = flag.db(),
                         flagtable = flagtable(),
-                        df.manualflags = df.manualflags())
+                        df.manualflags = df.manualflags(), usertype = usertype, userlocation = userlocation)
                     ,
                     error=function(cond) {
                       msg <<- paste("Import Failed - There was an error at ", Sys.time(),
@@ -848,11 +885,11 @@ server <- function(input, output, session) {
           #          control=list(smtpServer=MS))
         },
         error=function(cond) {
-          err <- print("User cannot connect to SMTP Server, cannot send email")
+          err <- print(paste("There was an error trying to send the email", err))
           return(err)
         },
         warning=function(cond) {
-          warn <- print("Send mail function caused a warning, but was completed successfully")
+          warn <- print(paste("Send mail function caused a warning, but was completed successfully", warn))
           return(warn)
         },
         finally={
@@ -860,7 +897,7 @@ server <- function(input, output, session) {
         }
       )
       return(out)
-    }
+  }
 
   ### IMPORT MESSAGE ####
   observeEvent(input$importFlags, {
@@ -907,9 +944,9 @@ server <- function(input, output, session) {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
               print(paste0("RDS update functions to call: ", isolate(rdsList())))
               rscript(
-                script = config[11], 
+                script = paste0(wach_team_root, config[["update_WAVE.R"]]), 
                 cmdargs = isolate(rdsList()),
-                libpath = config[15],
+                libpath = config[["R_lib_Path"]],
                 repos = default_repos(),
                 stdout = "updateWAVE.log",
                 stderr = "2>&1",
@@ -923,7 +960,7 @@ server <- function(input, output, session) {
                 user_profile = FALSE,
                 env = rcmd_safe_env(),
                 timeout = Inf,
-                wd = config[13], 
+                wd = paste0(wach_team_root, config[["WAVE-WIT update folder"]]), 
                 fail_on_status = TRUE,
                 color = FALSE
               )
