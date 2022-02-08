@@ -32,10 +32,10 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
 
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
-statoutliers<-mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
+statoutliers<-dplyr::mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
 
 rangeoutliers <- df.qccheck[NULL,names(df.qccheck)]
-rangeoutliers<-mutate(rangeoutliers, HistoricalMin=NA, HistoricalMean=NA, HistoricalMax=NA)
+rangeoutliers<-dplyr::mutate(rangeoutliers, HistoricalMin=NA, HistoricalMean=NA, HistoricalMax=NA)
 
 ### Creates input dataframe without Staff Gauge Height for QC check against trib_wach_summary
 df.qccheckNOgauge <- dplyr::filter(df.qccheck,Parameter!="Staff Gauge Height")
