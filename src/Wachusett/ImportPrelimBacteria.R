@@ -53,7 +53,8 @@ options(scipen = 999) # Eliminate Scientific notation in numerical fields
   
   # Read in all preliminary files and combine into 1
   # tables <- lapply(filelist2, read.csv, header = TRUE)
-  data <- read.csv(file, header = TRUE)
+  path <- paste0(rawdatafolder,"/", file)
+  data <- read.csv(path, header = TRUE)
   # Combine files
   # combined.df <- rbindlist(tables)
   # mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
@@ -94,7 +95,6 @@ options(scipen = 999) # Eliminate Scientific notation in numerical fields
   df.wq$Comment <- as.character(df.wq$Comment)
   df.wq$ResultReported <- as.character(df.wq$ResultReported)
 
-  path <- paste0(rawdatafolder,"/", file)
 
 # At this point there could be a number of checks to make sure data is valid
   # Check to make sure there are 25 variables (columns)
@@ -410,11 +410,10 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   #   value = T,
   #   perl =T)
 
-  filepath <- paste0(rawdatafolder,"/", file)
   ### Create the destination directory if it does not yet exist ####
   # sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
   dir.create(paste0(processedfolder,"/", str_sub(file, 9,12),"/PreliminaryBacteria/"))
-  file.rename(filepath, paste0(processedfolder,"/", str_sub(file,9,12),"/PreliminaryBacteria/", file))
+  file.rename(path, paste0(processedfolder,"/", str_sub(file, 9, 12),"/PreliminaryBacteria/", file))
   end <- now()
   print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds"))  
 }
