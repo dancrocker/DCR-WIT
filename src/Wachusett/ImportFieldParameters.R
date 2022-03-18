@@ -86,7 +86,8 @@ if(sensor =="YSI Pro Plus") {
   
   df <- data %>% 
     select(-c(Folder, Comment)) %>%
-    pivot_longer(cols = c(2:5), names_to = "Parameter", values_to = "FinalResult") %>% 
+    pivot_longer(cols = c(2:5), names_to = "Parameter", values_to = "FinalResult") %>%
+    filter(!is.na(FinalResult)) %>% 
     dplyr::rename("Location" = Site, "DateTimeET" = Timestamp, "Probe_ID" = Unit.ID) %>% 
     mutate("Units" = NA_character_, 
            "Probe_ID" = paste0(sensor," - " , substrRight(Probe_ID, 1)),
@@ -97,7 +98,8 @@ if(sensor =="YSI Pro Plus") {
   names(data)[4:8] <- c("Water Temperature", "Oxygen Saturation", "Dissolved Oxygen", "Specific Conductance", "pH")
   
   df <- data %>% 
-    pivot_longer(cols = c(4:8), names_to = "Parameter", values_to = "FinalResult") %>% 
+    pivot_longer(cols = c(4:8), names_to = "Parameter", values_to = "FinalResult", values_drop_na = TRUE) %>%
+    filter(!is.na(FinalResult)) %>% 
     dplyr::rename("Location" = DataID) %>%
     mutate("Units" = NA_character_, 
            "Location" = substrRight(Location, 4),
@@ -376,7 +378,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db , proce
   ### Move Field Parameter csv files to the processed data folder ####
   print("Moving staged field parameter csv files to the imported folder...")
   # Move the raw data file to the processed folder ####
-  processed_subdir <- paste0("/", max(year(df.wq$DateTimeUTC))) # Raw data archived by year, subfolders = Year
+  processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
   dir.create(processed_dir)
   file.rename(path, paste0(processed_dir,"/", file))
@@ -397,6 +399,6 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db , proce
  }
 
 
-#IMPORT_DATA(df, df.flags, path, file, filename.db, processedfolder = NULL, ImportTable, ImportFlagTable = NULL)
+# IMPORT_DATA(df, df.flags, path, file, filename.db, processedfolder = NULL, ImportTable, ImportFlagTable = NULL)
 ### END
  

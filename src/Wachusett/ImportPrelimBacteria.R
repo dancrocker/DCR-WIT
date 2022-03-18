@@ -42,24 +42,24 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
 options(scipen = 999) # Eliminate Scientific notation in numerical fields
   
   ### Generate a list of the preliminary data files:
-  filelist <- grep(
-    x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-    pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
-    value = T,
-    perl =T)
+  # filelist <- grep(
+  #   x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
+  #   pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
+  #   value = T,
+  #   perl =T)
   
   # Add the path to each file and save as a new list
-  filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
+  # filelist2 <- paste0(rawdatafolder,"/", filelist) # This will print the list of contents in the folder
   
   # Read in all preliminary files and combine into 1
-  tables <- lapply(filelist2, read.csv, header = TRUE)
-  
+  # tables <- lapply(filelist2, read.csv, header = TRUE)
+  data <- read.csv(file, header = TRUE)
   # Combine files
-  combined.df <- rbindlist(tables)
+  # combined.df <- rbindlist(tables)
   # mutate_at(vars(RESULT_ENTRY),funs('as.factor'))
   
   # Filter out unneeded columns and save to new df
-  df.wq <- combined.df[, -c(16,18:22,24:25)]
+  df.wq <- data[, -c(16,18:22,24:25)]
   
   # Rename Columns to match existing format
   names(df.wq) = c("SampleGroup",
@@ -404,16 +404,17 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   # Move Preliminary csv files to the processed data folder
   rawdatafolder <- str_sub(path, 1, nchar(path) - 20)
-  filelist <- grep(
-    x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-    pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
-    value = T,
-    perl =T)
+  # filelist <- grep(
+  #   x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
+  #   pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
+  #   value = T,
+  #   perl =T)
 
-  filelist2 <- paste0(rawdatafolder,"/", filelist)
+  filepath <- paste0(rawdatafolder,"/", file)
   ### Create the destination directory if it does not yet exist ####
-  sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
-  file.rename(filelist2, paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/", filelist))
+  # sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
+  dir.create(paste0(processedfolder,"/", str_sub(file, 9,12),"/PreliminaryBacteria/"))
+  file.rename(filepath, paste0(processedfolder,"/", str_sub(file,9,12),"/PreliminaryBacteria/", file))
   end <- now()
   print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds"))  
 }
