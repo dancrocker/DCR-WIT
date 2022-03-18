@@ -87,8 +87,8 @@ options(scipen = 999) # Eliminate Scientific notation in numerical fields
   df.wq$ReportedName <-  NA_character_
   df.wq$SampleNumber <-  NA_character_
   df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
-  df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
-  df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_MW_Confirm)
+  df.wq$EDEP_Confirm <- NA_character_
+  df.wq$EDEP_MW_Confirm <- NA_character_
   df.wq$Reportable <- NA_character_
   df.wq$Method <-  NA_character_
   df.wq$DetectionLimit <- NA_character_
