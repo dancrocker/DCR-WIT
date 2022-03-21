@@ -404,16 +404,10 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   # Move Preliminary csv files to the processed data folder
   rawdatafolder <- str_sub(path, 1, nchar(path) - 20)
-  # filelist <- grep(
-  #   x = list.files(rawdatafolder, ignore.case = T, include.dirs = F),
-  #   pattern = "^DCRBACT_[0-9]*.csv$", # regex to show xlsx files, but filter out lockfiles string = "$"
-  #   value = T,
-  #   perl =T)
-
-  ### Create the destination directory if it does not yet exist ####
-  # sapply(paste0(processedfolder,"/", str_sub(filelist,9,12),"/PreliminaryBacteria/"), dir.create)
   dir.create(paste0(processedfolder,"/", str_sub(file, 9,12),"/PreliminaryBacteria/"))
-  file.rename(path, paste0(processedfolder,"/", str_sub(file, 9, 12),"/PreliminaryBacteria/", file))
+  file_to <- paste0(processedfolder,"/", str_sub(file, 9, 12),"/PreliminaryBacteria/", file)
+  print(glue("Imported file being moved to {file_to}"))
+  file.rename(path, file_to)
   end <- now()
   print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds"))  
 }
