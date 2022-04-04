@@ -3,11 +3,10 @@
 #  DESCRIPTION: This script will Format/Process/Import YSI, turbidity, and stage data
 #        to the Database
 #  AUTHOR(S): Dan Crocker
-#  DATE LAST UPDATED: 2021-01-07
-#  GIT REPO: WIT
-#  R version 3.5.3 (2019-03-11)  i386
+#  DATE LAST UPDATED: 2022-03-28
+#  GIT REPO: 
+#  R version 4.1.2 (2021-11-01)  x86_64
 ##############################################################################.
-
 # NOTE - THIS SECTION IS FOR TESTING THE FUNCTION OUTSIDE SHINY
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
