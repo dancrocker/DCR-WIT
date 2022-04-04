@@ -50,7 +50,8 @@ source("src/Functions/outlook_email.R", local = T)
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   rootdir <- wach_team_root
-  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) 
+  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
+    filter(ImportMethod == "Importer-R")
 } else {
   rootdir <- quab_team_root
   datasets <-  read_excel(paste0(quab_team_root, config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
