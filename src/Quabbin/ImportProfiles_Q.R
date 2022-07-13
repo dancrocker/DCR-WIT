@@ -48,10 +48,15 @@ names(df.wq)[names(df.wq) == 'DO.mg.L.20F000963'] <- 'LDOd'
 names(df.wq)[names(df.wq) == 'SPC.uS.cm.20E100862'] <- 'SPCD'
 names(df.wq)[names(df.wq) == 'pH.20G100082'] <- 'pH'
 names(df.wq)[names(df.wq) == 'FNU.20F000995'] <- 'TUR-FNU'
+names(df.wq)[names(df.wq) == 'FNU.22A101407'] <- 'TUR-FNU'
 names(df.wq)[names(df.wq) == 'TAL.PC.RFU.20F160829'] <- 'BGA-PC-RFU'
 names(df.wq)[names(df.wq) == 'TAL.PC.ug.L.20F160829'] <- 'BGA-PC'
+names(df.wq)[names(df.wq) == 'Phycocyanin.RFU.20F160828'] <- 'BGA-PC-RFU'
+names(df.wq)[names(df.wq) == 'Phycocyanin.ug.L.20F160828'] <- 'BGA-PC'
 names(df.wq)[names(df.wq) == 'Chl.RFU.20F160829'] <- 'Chl-RFU'
 names(df.wq)[names(df.wq) == 'Chl.ug.L.20F160829'] <- 'Chl'
+names(df.wq)[names(df.wq) == 'Chlorophyll.RFU.20F160828'] <- 'Chl-RFU'
+names(df.wq)[names(df.wq) == 'Chlorophyll.ug.L.20F160828'] <- 'Chl'
 names(df.wq)[names(df.wq) == 'Vpos.m.20E102677'] <- 'DEP'
 names(df.wq)[names(df.wq) == 'ï..Date'] <- 'Date'
 
@@ -186,12 +191,12 @@ dfs[[3]] <- NULL # Removed condition to test for flags and put it in the setFlag
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
 rm(con)
-return(dfs)
+return(dfs) 
 } # END FUNCTION
 
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, probe, ImportTable = ImportTable, ImportFlagTable = NULL )
 
-# Extract each element needed
+# # Extract each element needed
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
 # df.flags  <- dfs[[3]]
@@ -232,7 +237,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))
 }
 ### END
-
-#IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+# 
+# IMPORT_DATA(df.wq, df.flags = NULL, path, file, filename.db, processedfolder = NULL,
 #            ImportTable = ImportTable, ImportFlagTable = NULL)
 
