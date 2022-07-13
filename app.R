@@ -50,8 +50,7 @@ source("src/Functions/outlook_email.R", local = T)
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   rootdir <- wach_team_root
-  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
-    filter(ImportMethod == "Importer-R")
+  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T)
 } else {
   rootdir <- quab_team_root
   datasets <-  read_excel(paste0(quab_team_root, config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
@@ -315,7 +314,7 @@ server <- function(input, output, session) {
 
 ### Reactive dfs DATA ####
   ds <- reactive({
-    filter(datasets, DataType == input$datatype)
+    filter(datasets, ImportMethod == "Importer-R", DataType == input$datatype)
   })
   scriptname <- reactive({ # Scripts common to both QB and Wach must be in both src folders!
     req(ds())
