@@ -89,7 +89,8 @@ df_param <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
 
 dbDisconnect(con)
 
-df.wq$`Unit ID` <- probe
+df.wq <- df.wq %>% 
+  mutate("Unit ID" = "YSI_EXO2")
 
 # UniqueID
 df.wq$UniqueID <- ""
@@ -160,10 +161,11 @@ df.wq$Parameter <- df_param$ParameterName[match(df.wq$Parameter, df_param$Parame
 df.wq$Units <- df_param$ParameterUnits[match(df.wq$Parameter, df_param$ParameterName)]
 
 # Reorder remaining 30 columns to match the database table exactly
-df.wq <- df.wq[, c(11, 1:5, 12, 6:10)]
+df.wq <- df.wq %>% select(c(11, 1:5, 12, 6:10))
 
 # Get column names from db table
 cnames <- dbListFields(con, schema_name = schema, ImportTable)
+
 #list(cnames)
 names(df.wq) <- cnames
 
