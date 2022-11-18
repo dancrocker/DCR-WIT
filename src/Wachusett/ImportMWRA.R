@@ -166,7 +166,7 @@ if(nrow(unapproved_data > 0)) {
 df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
 
 # Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
-df_no_misc <- df.wq %>% filter(Location != "MISC")
+df_no_misc <- df.wq %>% filter(Location != "WACHUSET-MISC")
 if (any(duplicated(paste0(df_no_misc$SampleDate, df_no_misc$Location, df_no_misc$Parameter)))) {
   # Send warning message to UI that it appears that there are storm samples in the data
   stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
