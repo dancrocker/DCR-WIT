@@ -167,8 +167,7 @@ df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filte
 
 # Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
 df_no_misc <- df.wq %>% filter(Location != "MISC")
-if (nrow(df_no_misc) != length(paste0(df_no_misc$SampleDate, df_no_misc$Location, df_no_misc$Parameter) %>% 
-                               unique())) {
+if (any(duplicated(paste0(df_no_misc$SampleDate, df_no_misc$Location, df_no_misc$Parameter)))) {
   # Send warning message to UI that it appears that there are storm samples in the data
   stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
          \nCheck the file before proceeding and split storm samples into separate file to import")
