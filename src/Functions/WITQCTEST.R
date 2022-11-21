@@ -19,7 +19,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
   
   files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
   
-  datadir <- paste0(wach_team_root, config[["DataCache"]])
+  datadir <- paste0(user_root, config[["DataCache"]])
   rds_files <- list.files(datadir, full.names = F , pattern = ".rds")
   rds_in <- which(rds_files %in% files) %>% as.numeric()
   rds_files <- rds_files[rds_in]
@@ -32,10 +32,10 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
 
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
-statoutliers<-mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
+statoutliers<-dplyr::mutate(statoutliers, HistoricalMin=NA, Percentile25=NA, HistoricalMedian=NA, Percentile75=NA, HistoricalMax=NA, IQR=NA)
 
 rangeoutliers <- df.qccheck[NULL,names(df.qccheck)]
-rangeoutliers<-mutate(rangeoutliers, HistoricalMin=NA, HistoricalMean=NA, HistoricalMax=NA)
+rangeoutliers<-dplyr::mutate(rangeoutliers, HistoricalMin=NA, HistoricalMean=NA, HistoricalMax=NA)
 
 ### Creates input dataframe without Staff Gauge Height for QC check against trib_wach_summary
 df.qccheckNOgauge <- dplyr::filter(df.qccheck,Parameter!="Staff Gauge Height")
@@ -130,7 +130,7 @@ for (i in 1:nrow(df.qccheck)){
 
 
 ### Print results of outlier check to unique WIT log
-QC_log_dir <- paste0(wach_team_root,"DataManagement/", config[["QC_Logfiles"]])
+QC_log_dir <- paste0(wach_team_root, config[["QC_Logfiles"]])
   # Delete a log of the same name if it exists
   if (file.exists(paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
     file.remove(paste0(QC_log_dir,"/",ImportTable,"_",file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))

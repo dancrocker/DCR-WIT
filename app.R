@@ -50,17 +50,17 @@ source("src/Functions/outlook_email.R", local = T)
 ### Set Location Dependent Variables - datatsets and distro
 if (userlocation == "Wachusett") {
   rootdir <- wach_team_root
-  datasets <-  read_excel(paste0(wach_team_root,config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) 
+  datasets <-  read_excel(paste0(wach_team_root, config[["Wach Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T)
 } else {
   rootdir <- quab_team_root
-  datasets <-  read_excel(paste0(quab_team_root,config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
+  datasets <-  read_excel(paste0(quab_team_root, config[["Quab Import Datasets"]]), sheet = 1, col_names = T, trim_ws = T) %>%
     filter(ImportMethod == "Importer-R")
 }
 
 # Set user info
 
 user <-  Sys.getenv("USERNAME") %>% toupper()
-userdata <- readxl::read_xlsx(path = paste0(wach_team_root, config[["Users"]]))
+userdata <- readxl::read_xlsx(path = paste0(user_root, config[["Users"]]))
 userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
@@ -80,7 +80,7 @@ con2 <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connecti
 
 flagdatasets <- filter(datasets, !is.na(FlagTable))
 
-if (try(dir.exists(paste0(wach_team_root, config[["DataCache"]])))) {
+if (try(dir.exists(paste0(user_root, config[["DataCache"]])))) {
   flags <- dbReadTable(con2, Id(schema = "Wachusett", table = "tblFlags")) %>%
     select(-3)
 } else {
@@ -314,7 +314,7 @@ server <- function(input, output, session) {
 
 ### Reactive dfs DATA ####
   ds <- reactive({
-    filter(datasets, DataType == input$datatype)
+    filter(datasets, ImportMethod == "Importer-R", DataType == input$datatype)
   })
   scriptname <- reactive({ # Scripts common to both QB and Wach must be in both src folders!
     req(ds())
@@ -353,7 +353,7 @@ server <- function(input, output, session) {
 
 ### FILE SELECTION ####
 
-  # Make the File List
+  # Make the File List (NOT FULL PATHS!)
   files <- eventReactive(rawdatafolder() ,{
     grep(x = list.files(rawdatafolder(), ignore.case = T, include.dirs = F),
          # pattern = "^(?=.*\\b(.xlsx|.xlsm)\\b)(?!.*\\$\\b)", # regex to show xlsx files, but filter out lockfiles string = "$"
@@ -944,7 +944,7 @@ server <- function(input, output, session) {
               print("Action Count was > 0, new data available in databases; Running the updateWAVE script to cache new .rds files")
               print(paste0("RDS update functions to call: ", isolate(rdsList())))
               rscript(
-                script = paste0(wach_team_root, config[["update_WAVE.R"]]), 
+                script = paste0(user_root, config[["update_WAVE.R"]]), 
                 cmdargs = isolate(rdsList()),
                 libpath = config[["R_lib_Path"]],
                 repos = default_repos(),
@@ -960,7 +960,7 @@ server <- function(input, output, session) {
                 user_profile = FALSE,
                 env = rcmd_safe_env(),
                 timeout = Inf,
-                wd = paste0(wach_team_root, config[["WAVE-WIT update folder"]]), 
+                wd = paste0(user_root, config[["WAVE-WIT update folder"]]), 
                 fail_on_status = TRUE,
                 color = FALSE
               )

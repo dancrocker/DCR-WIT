@@ -58,10 +58,10 @@ df.wq <- df.wq[,c(1:25)]
     stop("At least 1 column heading is unexpected.\n Check the file before proceeding")
   }
   # Check to see if there were any miscellaneous locations that did not get assigned a location
-  if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"),TRUE)) > 0) {
-  #Send warning message to UI if TRUE
-    warning("There are unspecified (MISC) - please review before importing data!")
-  }
+  # if (length(which(str_detect(df.wq$Name, "WACHUSET-MISC"),TRUE)) > 0) {
+  # #Send warning message to UI if TRUE
+  #   warning("There are unspecified (MISC) - please review before importing data!")
+  # }
   # Check to see if there were any GENERAL locations that did not get assigned a location
   if (length(which(str_detect(df.wq$Name, "GENERAL-GEN"),TRUE)) > 0) {
     # Send warning message to UI if TRUE
@@ -107,12 +107,7 @@ names(df.wq) <-  c("SampleGroup",
                  "Method",
                  "DetectionLimit")
 
-# Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
-if (nrow(df.wq) != length(paste0(df.wq$SampleDate, df.wq$Location,df.wq$Parameter) %>% unique())) {
-  # Send warning message to UI that it appears that there are storm samples in the data
-  stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
-         \nCheck the file before proceeding and split storm samples into separate file to import")
-}
+
 
 ### Date and Time ####
 
@@ -161,9 +156,24 @@ df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be,
 
 df.wq <- df.wq %>% slice(which(!grepl("Sample Address", df.wq$Parameter, fixed = TRUE)))
 df.wq <- df.wq %>% slice(which(!grepl("(DEP)", df.wq$Parameter, fixed = TRUE))) # Filter out rows where Parameter contains  "(DEP)"
-df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
 
 # Need to generate a warning here if any status is X  - which means the results were tossed out and not approved... 
+unapproved_data <- df.wq %>% slice(which(grepl("X", df.wq$Status, fixed = TRUE)))
+if(nrow(unapproved_data > 0)) {
+  stop("There seems to be unapproved data in this file (Status = 'X').\nThis data will be removed automatically. You should follow up with MWRA to obtain approved records.")
+}
+
+df.wq <- df.wq %>% slice(which(!grepl("X", df.wq$Status, fixed = TRUE))) # Filter out records where Status is X
+
+# Check to make sure there is not storm sample data in the dataset (> 1 Loc/Date combination)
+df_no_misc <- df.wq %>% filter(Location != "WACHUSET-MISC")
+if (any(duplicated(paste0(df_no_misc$SampleDate, df_no_misc$Location, df_no_misc$Parameter)))) {
+  # Send warning message to UI that it appears that there are storm samples in the data
+  stop("There seems to be storm sample data in this file.\n There are more than 1 result for a parameter on a single day. 
+         \nCheck the file before proceeding and split storm samples into separate file to import")
+}
+
+
 
 ### Fix the Location names ####
 df.wq$Location %<>%
