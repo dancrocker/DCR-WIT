@@ -129,7 +129,7 @@ df.wq$PrepOnET <- as.POSIXct(df.wq$PrepOnET) # note - this col does not contain 
 # df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-dbListTables(con, schema_name = schema)
+# dbListTables(con, schema_name = schema)
 
 params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
@@ -398,4 +398,4 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 ### END
 
-IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable)
+# IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable)
