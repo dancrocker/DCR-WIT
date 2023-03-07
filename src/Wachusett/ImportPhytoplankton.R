@@ -1,10 +1,10 @@
 ###############################  HEADER  ######################################
 #  TITLE: ImportPhytoplankton.R
-#  DESCRIPTION: This script will Format/Process MWRA data to DCR
+#  DESCRIPTION: This script will Format/Process Phytoplankton Data
 #  AUTHOR(S): Dan Crocker, Max Nyquist
-#  DATE LAST UPDATED: 2021-03-31
+#  DATE LAST UPDATED: 2023-03-07, JTL
 #  GIT REPO: 
-#  R version 3.6.0 (2019-04-26)  i386
+#  R version 4.0.3 (2020-10-10)  x86_64
 ##############################################################################.
 
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
@@ -42,7 +42,7 @@ sheetNum <- as.numeric(length(excel_sheets(path)))
 # Assign the sheet name
 sheetName <- excel_sheets(path)[sheetNum]
 # Read in the raw data - defaults to the last sheet added
-df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("AJ:AS"),  col_names = F, trim_ws = T, na = "nil") %>%
+df.wq <- read_excel(path, sheet = sheetNum, range = cell_cols("AN:BB"),  col_names = F, trim_ws = T, na = "nil") %>%
                     as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
 
 # Scan row 9 (Effort) for values, then reduce vector where effort is 0 or NA - these are column #s we want to remove
@@ -62,18 +62,23 @@ df.wq <- df.wq %>%
   add_row()
 
 # Count how many depths were sampled this day
-cdepths <- (ncol(df.wq) - 1)/2
+cdepths <- (ncol(df.wq) - 1)/3
 
 # Specify which columns are for phytoplankton counts
 countcols <- 2:(cdepths + 1)
 
 # Specify which columns are for Presence-Absence
-PAcols <- (ncol(df.wq) - cdepths +1):ncol(df.wq)
+# PAcols <- (ncol(df.wq) - cdepths -1):(ncol(df.wq) - cdepths) # old
+PAcols <- (max(countcols) + 1):(max(countcols) + cdepths)
 
-# Add information to the last row of data which holds the count vs PA specification in a new variable "DataType" (once transposed)
+# Specify which columns are for Number of Fields Counted
+nFIELDcols <- (max(PAcols) + 1):(max(PAcols) + cdepths)
+
+# Add information to the last row of data which holds the count vs PA vs number of fields counted specification in a new variable "DataType" (once transposed)
 df.wq[nrow(df.wq),1] <- "DataType"
 df.wq[nrow(df.wq),countcols] <- "count"
 df.wq[nrow(df.wq),PAcols] <- "PA"
+df.wq[nrow(df.wq),nFIELDcols] <- "nFields"
 
 # Transpose the entire dataframe and convert back to Dataframe from Matrix
 df.wq <- as.data.frame(t(df.wq))
@@ -90,6 +95,7 @@ df.wq <- gather(df.wq,"taxa","count", 10:ncol(df.wq)-1, na.rm =T) %>%
 df.wq$Date <- as.numeric(as.character(df.wq$Date))
 df.wq$Date <- XLDateToPOSIXct(df.wq$Date)
 df.wq$count <- round(as.numeric(df.wq$count),3)
+df.wq$nFields <- as.numeric(df.wq$nFields)
 
 # Drop unused levels from factor variables
 df.wq[, 2:8] <- droplevels(df.wq[, 2:8])
@@ -180,7 +186,8 @@ setIDs <- function(){
 }
 df.wq$ID <- setIDs()
 
-df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)]
+# df.wq <- df.wq[, c(16, 1:11, 15, 13, 14, 12)] # old
+df.wq <- df.wq[, c(17, 1:10, 12, 16, 14:15, 13, 11)]
 # Reorder remaining columns to match the database table exactly
 cnames <- dbListFields(con, schema = schema, ImportTable)
 names(df.wq) <- cnames
