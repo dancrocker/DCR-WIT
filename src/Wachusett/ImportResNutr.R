@@ -125,11 +125,11 @@ df.wq$SampleGroup <- as.character(df.wq$SampleGroup)
 df.wq$SampleNumber <- as.character(df.wq$SampleNumber)
 df.wq$PrepOnET <- as.POSIXct(df.wq$PrepOnET) # note - this col does not contain any data and could be removed
 
-# Recode Staff Gauge Depth to Water Depth 
-df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
+# # Recode Staff Gauge Depth to Water Depth (moved below after final result)
+# df.wq$Parameter <- recode(df.wq$Parameter, 'Staff Gauge Depth' = "Water Depth")
 
 # Fix the Parameter names  - change from MWRA name to ParameterName
-dbListTables(con, schema_name = schema)
+# dbListTables(con, schema_name = schema)
 
 params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
@@ -223,15 +223,25 @@ x <- df.wq$ResultReported
 # Function to determine FinalResult
 FR <- function(x) {
   if(str_detect(x, "<")){# BDL
-    as.numeric(gsub("<","", x), digits =4) # THEN strip "<" from reported result, make numeric, leave Result = Detect Limit.
+    as.numeric(gsub("<","", x), digits = 4) # THEN strip "<" from reported result, make numeric, leave Result = Detect Limit.
   } else if (str_detect(x, ">")){
       as.numeric(gsub(">","", x)) # THEN strip ">" form reported result, make numeric.
-    } else {
+  } else {
       as.numeric(x)
     }# ELSE THEN just use Result Reported for Result and make numeric
   }
 df.wq$FinalResult <- mapply(FR,x) %>%
   round(digits = 4)
+
+# Convert water depth reported in f to m, change param name and units columns
+df.wq2 <- df.wq %>% 
+  filter(!df.wq$ReportedName == "Staff Gauge Depth")
+depthdata <- df.wq %>% 
+  filter(df.wq$ReportedName == "Staff Gauge Depth")
+depthdata$Parameter <- as.character("Water Depth")
+depthdata$Units <- as.character("m")
+depthdata$FinalResult <- round(as.numeric(depthdata$ResultReported)/3.281, 1) # move to finalresult
+df.wq <- rbind(df.wq2, depthdata)
 
 ### Flag (numeric)
 # Use similar function as to assign flags
@@ -344,9 +354,9 @@ return(dfs)
 
 #### COMMENT OUT WHEN RUNNING SHINY
 ########################################################################################################.
-#RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
+# #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db)
-#
+# 
 # # Extract each element needed
 # df.wq     <- dfs[[1]]
 # path      <- dfs[[2]]
@@ -388,4 +398,4 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 }
 ### END
 
-#IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable)
+# IMPORT_DATA(df.wq, df.flags, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable)
