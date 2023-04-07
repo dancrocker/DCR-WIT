@@ -12,17 +12,17 @@
 # COMMENT OUT BELOW WHEN RUNNING FUNCTION IN SHINY
 
 # # Load libraries needed ####
-
-    # library(tidyverse)
-    # library(stringr)
-    # library(odbc)
-    # library(RODBC)
-    # library(DBI)
-    # library(lubridate)
-    # library(magrittr)
-    # library(readxl)
-    # library(testthat)
-    # library(glue)
+# 
+# library(tidyverse)
+# library(stringr)
+# library(odbc)
+# library(RODBC)
+# library(DBI)
+# library(lubridate)
+# library(magrittr)
+# library(readxl)
+# library(testthat)
+# library(glue)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -289,6 +289,109 @@ FLAG <- function(x) {
 }
 df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
+#Duplicate fail flag
+dups <- df.wq %>% filter(Location %in% c("WFD1","WFD2","WFD3")) %>%
+  rename(Duplicate = Location) %>%
+  mutate(Date = as.Date(DateTimeET))
+
+if(nrow(dups)>0){
+  dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
+  
+  dup_df_rename <- dup_df %>% rename(Duplicate = Dup_Blank_code)
+  
+  dups <- inner_join(dups, dup_df_rename, by=c("Date","Duplicate")) %>% 
+    rename(Location = MWRA_Location,
+           UniqueID_QC = UniqueID) %>%
+    select(Date, Duplicate, Location, Parameter, Units, FinalResult, UniqueID_QC)
+  
+  df.wq.date <- df.wq %>% mutate(Date = as.Date(DateTimeET))
+  
+  dups_combined <- inner_join(dups, df.wq.date, by=c("Date","Location","Parameter","Units")) %>%
+    rename(TribResult = "FinalResult.y",
+           DupResult = "FinalResult.x") %>%
+    mutate(RPD = round(((abs(TribResult-DupResult)/((TribResult+DupResult)/2))*100),digits=1))
+  
+  ### Calculating RPD for bacteria dups
+  bact_dups <- dups_combined %>% 
+    filter(Parameter == "E. coli") %>%
+    mutate(Log10DupResult = log10(DupResult),
+           Log10TribResult = log10(TribResult),
+           RPD = round(((abs(Log10TribResult-Log10DupResult)/((Log10TribResult+Log10DupResult)/2))*100),digits=1),
+           Pass = if_else((abs(TribResult - DupResult) <= 50), "PASS",
+                          if_else(TribResult < 5000 & DupResult < 5000,
+                                  if_else(TribResult < 500 & DupResult < 500,
+                                          if_else(TribResult < 50 & DupResult < 50,
+                                                  if_else(RPD>20, "FAIL","PASS"),
+                                                  if_else(RPD>30, "FAIL","PASS")),
+                                          if_else(RPD > 10, "FAIL","PASS")),
+                                  if_else(RPD > 5, "FAIL", "PASS"))))
+  
+  dups_other <- dups_combined %>% 
+    filter(!Parameter %in% c("E. coli", "Dissolved Oxygen", "Water Temperature","Oxygen Saturation")) %>%
+    mutate(RPD = round(((abs(TribResult-DupResult)/((TribResult+DupResult)/2))*100),digits=1),
+           Pass = if_else(RPD>30, "FAIL","PASS"))
+  
+  
+  dups_all <- bind_rows(bact_dups, dups_other)
+  
+  dups_fail <- filter(dups_all, Pass == "FAIL") 
+  
+  failed_dups <- dups_fail$UniqueID_QC
+  
+  dups_fail <- dups_fail %>% dplyr::select(Parameter, Date) %>%
+                      mutate(ParameterDate = paste0(Parameter,"_",Date))
+  
+  dups_fail_param_date <- unique(dups_fail$ParameterDate)
+  
+  df.wq <- df.wq %>% 
+              mutate(Date = as.Date(DateTimeET),
+                     ParameterDate = paste0(Parameter,"_",Date),
+                     DupFlags = if_else(startsWith(Location,"M") & (ParameterDate %in% dups_fail_param_date), 127, 
+                                        if_else(UniqueID %in% failed_dups, 129, NULL)))
+                     
+
+
+}else{
+  df.wq$DupFlags <- NULL}
+
+#Blank flags
+blanks <- df.wq %>% filter(Location %in% c("WFB1","WFB2")) %>%
+  rename(Blank = Location) %>%
+  mutate(Date = as.Date(DateTimeET))
+
+if(nrow(blanks)>0){
+blank_df_rename <- dup_df %>% rename(Blank = Dup_Blank_code)
+
+blanks <- inner_join(blanks, blank_df_rename, by=c("Date","Blank")) %>% 
+  rename(Location = MWRA_Location,
+         UniqueID_QC = UniqueID) 
+
+blanks <- blanks %>% mutate(
+  Pass = case_when(
+    str_detect(blanks$ResultReported,"<") ~ "PASS",
+    (str_detect(blanks$ResultReported,"<")==FALSE) ~ "FAIL",
+  )
+)
+
+blanks_fail <- filter(blanks, Pass == "FAIL")
+
+failed_blanks <- blanks_fail$UniqueID_QC
+
+blanks_fail <- blanks_fail %>% dplyr::select(Parameter, Date) %>%
+  mutate(ParameterDate = paste0(Parameter,"_",Date))
+
+blanks_fail_param_date <- unique(blanks_fail$ParameterDate)
+
+
+df.wq <- df.wq %>% 
+  mutate(Date = as.Date(DateTimeET),
+         BlankFlags = if_else(startsWith(Location,"M") & (ParameterDate %in% blanks_fail_param_date), 128, 
+                              if_else(UniqueID %in% failed_blanks, 130, NULL)))
+
+}else{
+  df.wq$BlankFlags <- NA
+}
+
 ### Storm SampleN (numeric) ####
 df.wq$StormSampleN <- NA_character_
 
@@ -367,14 +470,39 @@ df.wq$ID <- setIDs()
 setFlagIDs <- function(){
   if(all(is.na(df.wq$FlagCode)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
   # Split the flags into a separate df and assign new ID
-  df.flags <- as.data.frame(select(df.wq, c("ID","FlagCode"))) %>%
+  df.flags.censored <- as.data.frame(select(df.wq, c("ID","FlagCode"))) %>%
     rename("SampleID" = ID) %>%
     drop_na()
   } else {
-    df.flags <- NA
+    df.flags.censored <- as.data.frame(NULL)
   }
  
-  if(class(df.flags) == "data.frame"){
+  ##Dup flags
+  if(all(is.na(df.wq$DupFlags)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
+    # Split the flags into a separate df and assign new ID
+    df.flags.dup <- as.data.frame(select(df.wq, c("ID","DupFlags"))) %>%
+      rename("SampleID" = ID,
+             "FlagCode" = DupFlags) %>%
+      drop_na()
+  } else {
+    df.flags.dup <- as.data.frame(NULL)
+  }
+  
+  ##Blank flags
+  if(all(is.na(df.wq$BlankFlags)) == FALSE){ # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
+    # Split the flags into a separate df and assign new ID
+    df.flags.blk <- as.data.frame(select(df.wq, c("ID","BlankFlags"))) %>%
+      rename("SampleID" = ID,
+             "FlagCode" = BlankFlags) %>%
+      drop_na()
+  } else {
+    df.flags.blk <- as.data.frame(NULL)
+  } 
+  
+  df.flags <- bind_rows(df.flags.censored, df.flags.dup, df.flags.blk)
+  
+  
+  if(nrow(df.flags) > 0){
       query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
       if(is.na(query.flags)) {
@@ -447,7 +575,11 @@ df.wq <- df.wq %>% select(-c(Description,
                              SampleDate,
                              FlagCode,
                              date,
-                             Time
+                             Time,
+                             DupFlags,
+                             BlankFlags,
+                             Date,
+                             ParameterDate
                              )
 )
 
