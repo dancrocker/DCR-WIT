@@ -41,6 +41,10 @@ df.wq <- read_excel(path, sheet = 1, col_names = T, trim_ws = T, na = "nil") %>%
   as.data.frame()   # This is the raw data - data comes in as xlsx file, so read.csv will not work
 df.wq <- df.wq[,c(1:25)]
 
+# Source WITQCTEST
+source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
+
+
 ########################################################################.
 ###                        Perform Data checks                      ####
 ########################################################################.
@@ -289,76 +293,87 @@ FLAG <- function(x) {
 }
 df.wq$FlagCode <- mapply(FLAG,x) %>% as.numeric()
 
-#Duplicate fail flag
+### Flagging Duplicates ####
+
+# Get duplicates
 dups <- df.wq %>% filter(Location %in% c("WFD1","WFD2","WFD3")) %>%
   rename(Duplicate = Location) %>%
   mutate(Date = as.Date(DateTimeET))
 
+# Get table to find which sites duplicates match with, needed for blanks too, so can't be under next If()
+dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
+
+# Only proceed if there are duplicates
 if(nrow(dups)>0){
-  dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
   
+
   dup_df_rename <- dup_df %>% rename(Duplicate = Dup_Blank_code)
   
+  # Create temporary dataframe to match regular samples with dups
   dups <- inner_join(dups, dup_df_rename, by=c("Date","Duplicate")) %>% 
     rename(Location = MWRA_Location,
            UniqueID_QC = UniqueID) %>%
     select(Date, Duplicate, Location, Parameter, Units, FinalResult, UniqueID_QC)
   
+  # Add date to df.wq which follows through the whole code
   df.wq.date <- df.wq %>% mutate(Date = as.Date(DateTimeET))
   
+  # Combine the duplicate dataframe with the full dataframe
   dups_combined <- inner_join(dups, df.wq.date, by=c("Date","Location","Parameter","Units")) %>%
     rename(TribResult = "FinalResult.y",
-           DupResult = "FinalResult.x") %>%
-    mutate(RPD = round(((abs(TribResult-DupResult)/((TribResult+DupResult)/2))*100),digits=1))
+           DupResult = "FinalResult.x")
   
-  ### Calculating RPD for bacteria dups
+  ### Calculating RPD for bacteria dups and whether it passes. Uses BACT_DUP_TEST function from WITQCTEST.R
   bact_dups <- dups_combined %>% 
     filter(Parameter == "E. coli") %>%
     mutate(Log10DupResult = log10(DupResult),
            Log10TribResult = log10(TribResult),
            RPD = round(((abs(Log10TribResult-Log10DupResult)/((Log10TribResult+Log10DupResult)/2))*100),digits=1),
-           Pass = if_else((abs(TribResult - DupResult) <= 50), "PASS",
-                          if_else(TribResult < 5000 & DupResult < 5000,
-                                  if_else(TribResult < 500 & DupResult < 500,
-                                          if_else(TribResult < 50 & DupResult < 50,
-                                                  if_else(RPD>20, "FAIL","PASS"),
-                                                  if_else(RPD>30, "FAIL","PASS")),
-                                          if_else(RPD > 10, "FAIL","PASS")),
-                                  if_else(RPD > 5, "FAIL", "PASS"))))
+           Pass = BACT_DUP_TEST(TribResult, DupResult, RPD))
   
+  ### Calculating RPD for non-bacteria dups and whether they pass
   dups_other <- dups_combined %>% 
     filter(!Parameter %in% c("E. coli", "Dissolved Oxygen", "Water Temperature","Oxygen Saturation")) %>%
     mutate(RPD = round(((abs(TribResult-DupResult)/((TribResult+DupResult)/2))*100),digits=1),
            Pass = if_else(RPD>30, "FAIL","PASS"))
   
-  
+  ### Combine dataframes once Pass/Fail determined
   dups_all <- bind_rows(bact_dups, dups_other)
-  
+
+  ### Filter out only the fails
   dups_fail <- filter(dups_all, Pass == "FAIL") 
   
+  ## Get UniqueIDs of the failed dups
   failed_dups <- dups_fail$UniqueID_QC
   
+  ## Create unique identifer with Parameter and Date to help match with other samples collected that day
   dups_fail <- dups_fail %>% dplyr::select(Parameter, Date) %>%
                       mutate(ParameterDate = paste0(Parameter,"_",Date))
   
+  ## Only keep unique Parameter/Date combos
   dups_fail_param_date <- unique(dups_fail$ParameterDate)
   
+  ## Flag failed dups with 129
+  ## Flag samples on same date with same parameter as failed dup as 127
   df.wq <- df.wq %>% 
               mutate(Date = as.Date(DateTimeET),
                      ParameterDate = paste0(Parameter,"_",Date),
                      DupFlags = if_else(startsWith(Location,"M") & (ParameterDate %in% dups_fail_param_date), 127, 
                                         if_else(UniqueID %in% failed_dups, 129, NULL)))
-                     
-
-
+   
 }else{
+  
+  # If no duplicates in dataset, DupFlags column is empty
   df.wq$DupFlags <- NULL}
 
-#Blank flags
+### Flagging Blanks ####
+
+#Find Blanks in dataset
 blanks <- df.wq %>% filter(Location %in% c("WFB1","WFB2")) %>%
   rename(Blank = Location) %>%
   mutate(Date = as.Date(DateTimeET))
 
+#Only proceed if blanks exist
 if(nrow(blanks)>0){
 blank_df_rename <- dup_df %>% rename(Blank = Dup_Blank_code)
 
@@ -366,6 +381,7 @@ blanks <- inner_join(blanks, blank_df_rename, by=c("Date","Blank")) %>%
   rename(Location = MWRA_Location,
          UniqueID_QC = UniqueID) 
 
+# Blanks Pass if a less than is in result, otherwise Fail. Blanks should be less than minimum detection limit
 blanks <- blanks %>% mutate(
   Pass = case_when(
     str_detect(blanks$ResultReported,"<") ~ "PASS",
@@ -373,22 +389,28 @@ blanks <- blanks %>% mutate(
   )
 )
 
+# Get only failed blanks
 blanks_fail <- filter(blanks, Pass == "FAIL")
 
+# Get UniqueIDs of failed blanks
 failed_blanks <- blanks_fail$UniqueID_QC
 
+# Calculate new field for Parameter/Date combo for failed blanks
 blanks_fail <- blanks_fail %>% dplyr::select(Parameter, Date) %>%
   mutate(ParameterDate = paste0(Parameter,"_",Date))
 
+# Only keep unique values of Parameter/Date
 blanks_fail_param_date <- unique(blanks_fail$ParameterDate)
 
-
+# Add flag 130 for failed blanks
+# Add flag 128 for samples sampled on same day with same parameter as a failed blank
 df.wq <- df.wq %>% 
   mutate(Date = as.Date(DateTimeET),
          BlankFlags = if_else(startsWith(Location,"M") & (ParameterDate %in% blanks_fail_param_date), 128, 
                               if_else(UniqueID %in% failed_blanks, 130, NULL)))
 
 }else{
+  # If no blanks in data, BlankFlags column is empty
   df.wq$BlankFlags <- NA
 }
 
@@ -499,6 +521,7 @@ setFlagIDs <- function(){
     df.flags.blk <- as.data.frame(NULL)
   } 
   
+  # Combine all flag dataframes (if one is empty, it'll be a blank dataframe that will not add a new row)
   df.flags <- bind_rows(df.flags.censored, df.flags.dup, df.flags.blk)
   
   
@@ -588,7 +611,6 @@ col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
-source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
 qc_message <- QCCHECK( df.qccheck = df.wq, 
                        file = file, 
                        ImportTable = ImportTable)
