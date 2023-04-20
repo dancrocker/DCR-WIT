@@ -42,7 +42,7 @@ df.wq <- read_excel(path, sheet = 1, col_names = T, trim_ws = T, na = "nil") %>%
 df.wq <- df.wq[,c(1:25)]
 
 # Source WITQCTEST
-source("/src/Functions/WITQCTEST.R", local = TRUE)
+source("src/Functions/WITQCTEST.R", local = TRUE)
 
 
 ########################################################################.
@@ -609,7 +609,7 @@ col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
-source("/src/Functions/WITQCTEST.R", local = T)
+source("src/Functions/WITQCTEST.R", local = T)
 
 qc_message <- QCCHECK( df.qccheck = df.wq, 
                        file = file, 
