@@ -456,7 +456,7 @@ col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
-source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
+source("/src/Functions/WITQCTEST.R", local = T)
 qc_message <- QCCHECK( df.qccheck = df.wq, 
                        file = file, 
                        ImportTable = ImportTable)
