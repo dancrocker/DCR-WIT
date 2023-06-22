@@ -556,11 +556,13 @@ df.flags <- setFlagIDs()
 ### Check for sample location/time combination already in database. Create dataframe for records with no matches (possible time fix needed)
 
 #Create empty dataframe
-unmatchedtimes <- df.wq[NULL,names(df.wq)]
+unmatchedtimes <- df.wq[NULL, names(df.wq)]
 # Bring in tributary location IDs
 locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[tblWatershedLocations] WHERE [LocationType] ='Tributary'")))
-# Keep only locations of type "Tributary"
-df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA)
+
+# Keep only locations of type "Tributary", remove WFB2 since it will always have unmatched times
+df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA, Location != "WFB2")
+
 rm(locations.tribs)
 
 # Only do the rest of the unmatched times check if there are tributary locations in data being processed
@@ -573,18 +575,18 @@ if(nrow(df.timecheck)>0){
     
   #Loop adds row for every record without matching location/date/time in database
   for (i in 1:nrow(df.timecheck)){
-    if ((df.timecheck$DateTimeET[i] %in% dplyr::filter(databasetimes,Location==df.timecheck$Location[i])$DateTimeET) == FALSE){
+    if ((df.timecheck$DateTimeET[i] %in% dplyr::filter(databasetimes, Location == df.timecheck$Location[i])$DateTimeET) == FALSE){
       unmatchedtimes <- bind_rows(unmatchedtimes,df.timecheck[i,])
    }}
 
   rm(mindatecheck, databasetimes)
 
 }  
-  
+
 ### Print unmatchedtimes to log, if present
-if (nrow(unmatchedtimes)>0){
+if (nrow(unmatchedtimes) > 0){
   print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
-  print(unmatchedtimes[c("ID","UniqueID","ResultReported")],print.gap=4,right=FALSE)
+  print(unmatchedtimes[c("ID","UniqueID","ResultReported")], print.gap = 4, right = FALSE)
 }
 
 ########################################################################.
