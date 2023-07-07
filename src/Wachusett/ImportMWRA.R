@@ -282,7 +282,7 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 df.wq$FlagCode <- NA
 FLAG <- function(x) {
   if (str_detect(x, "<")) {
-    100     # THEN set BDL (100 for all datasets except reservoir nutrients)
+    104     # THEN set EDL (104 for all datasets except reservoir nutrients)
   } else if (str_detect(x, ">")){
       101     # THEN set to 101 for ADL
     } else {
