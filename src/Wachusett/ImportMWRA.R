@@ -561,7 +561,7 @@ unmatchedtimes <- df.wq[NULL, names(df.wq)]
 locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[tblWatershedLocations] WHERE [LocationType] ='Tributary'")))
 
 # Keep only locations of type "Tributary", remove WFB2 since it will always have unmatched times
-df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA, Location != "WFB2")
+df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA, !Location %in% c("MISC","WFB2"))
 
 rm(locations.tribs)
 
