@@ -231,12 +231,14 @@ blanks <- inner_join(blanks, blank_df_rename, by=c("Date","Blank")) %>%
   rename(Location = MWRA_Location) 
 
 #Calculate whether blanks fail
-blanks <- blanks %>% mutate(
-                      Pass = case_when(
-                        (Parameter=="Turbidity NTU" & FinalResult >=1) ~ "FAIL",
-                        (str_detect(blanks$ResultReported,"<")==FALSE) ~ "FAIL",
-                          TRUE ~ "PASS")
-                            )
+blanks <- blanks %>% 
+  # rowwise %>% 
+  mutate(
+    Pass = case_when(
+      (Parameter =="Turbidity NTU" & FinalResult >=1) ~ "FAIL",
+      (str_detect(ResultReported,"<")==FALSE) ~ "FAIL",
+      TRUE ~ "PASS")
+  )
 # Get only failed blanks
 blanks_fail <- filter(blanks, Pass == "FAIL") %>%
   dplyr::rename(ID = ID.x,
@@ -244,7 +246,6 @@ blanks_fail <- filter(blanks, Pass == "FAIL") %>%
 }else{
   #If there are no blanks, make empty dataframe for failed blanks
   blanks_fail <- as.data.frame(NULL)}
-
 
 ### Print results of outlier check to unique WIT log
 QC_log_dir <- paste0(wach_team_root, config[["QC_Logfiles"]])
