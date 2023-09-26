@@ -1,27 +1,24 @@
 ###############################  HEADER  ######################################
-#  TITLE: FormatMWRA.R
+#  TITLE: ImportResNutr.R
 #  DESCRIPTION: This script will Format/Process MWRA data to DCR
 #  AUTHOR(S): Nick Zinck/Dan Crocker, October, 2017
-#  DATE LAST UPDATED: 2021-02-22 (update for sql server)
-#  This script will process and import MWRA Projects: WATTRB, WATTRN, MDCMNTH, WATBMP, QUABBIN, MDHEML
-#     - As of 10/23/17 testing results positive for WATTRB/WATTRN
-#     - Edits to script will likely be needed after testing other project data
-#     - Additional variables may need to be generated to interact with shiny App
+#  DATE LAST UPDATED: 2023-09-26 (JTL)
+#  This script will process and import MWRA Projects: MDCMNTH
 #  GIT REPO: 
-#  R version 3.6.0 (2019-04-26)  i386
+#  R version 4.0.3 (2020-10-10)  x86_64
 ##############################################################################.
 
-# Load libraries needed
-
+# # Load libraries needed
+# 
 # library(stringr)
 # library(odbc)
 # library(RODBC)
 # library(DBI)
 # library(lubridate)
 # library(magrittr)
-# Tidyverse and readxl are loaded in App.r
-
-# COMMENT OUT ABOVE CODE EXCEPT FOR LOADING LIBRARIES WHEN RUNNING IN SHINY
+# # Tidyverse and readxl are loaded in App.r
+# 
+# # COMMENT OUT ABOVE CODE EXCEPT FOR LOADING LIBRARIES WHEN RUNNING IN SHINY
 
 ########################################################################.
 ####                 PROCESSING FUNCTION                            ####
@@ -61,6 +58,12 @@ df.wq <- df.wq[,c(1:25)]
 if (length(which(str_detect(df.wq$Location, "GENERAL-GEN"),TRUE)) > 0) {
   #warning3 <- print(paste0("There are unspecified (MISC) locations that need to be corrected before importing data"))
   stop("There are unspecified (GEN) locations that need to be corrected before importing data")
+}
+# 
+# # Check to see if depths are reported correctly
+if (length(which(df.wq$`Formatted Entry`[df.wq$`Display String` == "f"] < 1)) > 0) {
+  #warning3 <- print(paste0("There are reported depths less than 1 ft. This likely indicates that values are in meters but units are in feet."))
+  stop("There are reported depths less than 1 ft. This likely indicates that values are in meters but units are in feet.")
 }
 
 # Any other checks?  Otherwise data is validated, proceed to reformatting...
@@ -235,12 +238,20 @@ df.wq$FinalResult <- mapply(FR,x) %>%
 
 # Convert water depth reported in f to m, change param name and units columns
 df.wq2 <- df.wq %>% 
-  filter(!df.wq$ReportedName == "Staff Gauge Depth")
+  filter(!df.wq$ReportedName == "Staff Gauge Depth") 
+
 depthdata <- df.wq %>% 
-  filter(df.wq$ReportedName == "Staff Gauge Depth")
-depthdata$Parameter <- as.character("Water Depth")
-depthdata$Units <- as.character("m")
-depthdata$FinalResult <- round(as.numeric(depthdata$ResultReported)/3.281, 1) # move to finalresult
+  filter(Parameter == "Staff Gauge Height") %>% 
+  mutate(Parameter = "Water Depth")
+
+if (nrow(df.wq %>% filter(Units == "f")) > 0) { # if units are feet
+  depthdata <- depthdata %>% 
+    mutate(Units = as.character("m"),
+      FinalResult = round(as.numeric(ResultReported)/3.281, 1))
+} else {
+  depthdata <- depthdata
+}
+
 df.wq <- rbind(df.wq2, depthdata)
 
 ### Flag (numeric)
@@ -352,9 +363,9 @@ rm(con)
 return(dfs)
 } # END FUNCTION
 
-#### COMMENT OUT WHEN RUNNING SHINY
-########################################################################################################.
-# #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
+# #### COMMENT OUT WHEN RUNNING SHINY
+# ########################################################################################################.
+# # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
 # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db)
 # 
 # # Extract each element needed
