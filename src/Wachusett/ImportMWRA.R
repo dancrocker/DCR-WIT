@@ -389,12 +389,9 @@ if(nrow(blanks)>0) {
            UniqueID_QC = UniqueID) 
   
   # Blanks Pass if a less than is in result, otherwise Fail. Blanks should be less than minimum detection limit
-  blanks <- blanks %>% mutate(
-    Pass = case_when(
-      str_detect(blanks$ResultReported,"<") ~ "PASS",
-      (str_detect(blanks$ResultReported,"<")==FALSE) ~ "FAIL",
-    )
-  )
+  blanks <- blanks %>% 
+    mutate(Pass = ifelse(is.na(FlagCode), "FAIL", ifelse(FlagCode == 104, "PASS", "FAIL")))
+
   
   # Get only failed blanks
   blanks_fail <- filter(blanks, Pass == "FAIL")
