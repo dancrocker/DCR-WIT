@@ -354,7 +354,7 @@ if(nrow(dups)>0) {
     ## Flag failed dups with 129
     ## Flag samples on same date with same parameter as failed dup as 127
     df.wq <- df.wq %>% 
-      rowise() %>% 
+      rowwise() %>% 
       mutate(Date = as.Date(DateTimeET),
              ParameterDate = paste0(Parameter,"_",Date),
              DupFlags = ifelse(startsWith(Location,"M") & (ParameterDate %in% dups_fail_param_date), 127, 
