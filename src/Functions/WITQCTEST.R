@@ -26,7 +26,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
 
 ### FETCH CACHED DATA FROM WAVE RDS FILES ####
   
-  files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
+  files <-  c("trib_wach_summary.rds")
   
   datadir <- paste0(user_root, config[["DataCache"]])
   rds_files <- list.files(datadir, full.names = F , pattern = ".rds")
@@ -51,9 +51,13 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
   
   # Get dataframe for duplicate/blank locations
   dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
-
+  df_wach_param <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
   dbDisconnect(con)
   rm(con)
+  
+### Drop Edit_timestamp from tblParameters
+  df_wach_param <- df_wach_param %>%
+    select(-Edit_timestamp)
   
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
