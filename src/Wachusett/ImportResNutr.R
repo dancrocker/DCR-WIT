@@ -379,6 +379,7 @@ return(dfs)
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
   
+  start <- now()
   dsn <- filename.db
   database <- "DCR_DWSP"
   schema <- 'Wachusett'
@@ -408,7 +409,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     dir.create(processed_dir)
   }
   file.rename(path, paste0(processed_dir,"/", file))
-
+  end <- now()
+  return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
+  
 }
 ### END
 

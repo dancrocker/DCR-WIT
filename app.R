@@ -12,9 +12,9 @@
 # Notes:
 #   1. If running locally the config file must be loaded first (see WAVE_WIT_Local script)
 
-#options(shiny.reactlog = TRUE) # This is a visual representation of reactivity
+options(shiny.reactlog = TRUE) # This is a visual representation of reactivity
 
-########################################################################.
+#######################################################################.
 ###    Load Libraries and Script (Sources, Modules, and Functions)  ####
 ########################################################################.
 
@@ -64,7 +64,7 @@ userdata <- readxl::read_xlsx(path = paste0(user_root, config[["Users"]]))
 userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
 username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
 useremail <- userinfo$Email[1]
-# userlocation <<- userinfo$Location[1]
+userlocation <<- userinfo$Location[1]
 usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
 schema <<- userlocation
 # Specify mail server
@@ -456,7 +456,10 @@ server <- function(input, output, session) {
       )
     } else {
       reactive_emailmsg(
-        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p></body>")
+          paste0("<body><p>",username," has imported ", nrow(df.wq()), 
+            " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", 
+            input$file, "for data between the dates of ", min(as.Date(df.wq()$DateTimeET), na.rm = TRUE),
+            " and ", max(as.Date(df.wq()$DateTimeET), na.rm = TRUE), "</p></body>")
       )
       reactive_emailsubject(
         paste0("New Data has been Imported to a ", userlocation," Database")
@@ -487,7 +490,7 @@ server <- function(input, output, session) {
         })
         showModal(modalDialog(
           title = "Warning: Sample(s) with unmatched times processed.",
-          HTML("<h4>Data processing was successful.<br/><br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>IDs and UniqeIDs for the samples with unmatched times are presented below and have also been printed to the WIT log.</h4><br/>"),
+           HTML("<h4>Data processing was successful.<br/><br/>At least one location had a date and time not present in the database.<br/>Check for incorrect times before importing.<br/>IDs and UniqeIDs for the samples with unmatched times are presented below and have also been printed to the WIT log.</h4><br/>"),
           renderDataTable(displaytable())
         ))
         }
@@ -574,8 +577,13 @@ server <- function(input, output, session) {
             import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
           } else {
             print(paste0("Data Import Successful at ", Sys.time()))
-            import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
+            if (input$datatype %in% c("Nutrients (MDCMTH)", "Profiles", "Phytoplankton")){
+              import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
+                input$datatype, " | Filename = ", input$file, " for sample date(s) of: ,", df.wq$SampleDate[1])
+            } else {
+              import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
                                   input$datatype, " | Filename = ", input$file)
+          }
             NewCount <- actionCount() + 1
             actionCount(NewCount)
             new_rds_list <- c(paste0(rdsList()), rds_updates())
@@ -974,4 +982,5 @@ server <- function(input, output, session) {
 } # end server function
 
 #combines the user interface and server (it's a must)
-shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE, port = 8887))
+shinyApp(ui = ui, server = server, options = list(port = 8887))
+### end ####
