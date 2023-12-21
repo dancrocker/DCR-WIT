@@ -11,13 +11,22 @@
 ###  Load required dplyr package
 # library(dplyr)
 
-### Function compares df.qccheck records (in the format at the end of WIT processing before importing) to historical min/max and percentiles
+#Create function for evaluating bacteria RPD
+BACT_DUP_TEST <- function(TribResult, DupResult, RPD){
+  if_else((abs(TribResult - DupResult) <= 50), "PASS",
+          case_when((TribResult > 5000 | DupResult > 5000) & RPD >= 5 ~ "FAIL",
+                    (TribResult > 500 | DupResult > 500) & RPD >= 10 ~ "FAIL",
+                    (TribResult > 50 | DupResult > 50) & RPD >= 20 ~ "FAIL",
+                    RPD >= 30 ~ "FAIL",
+                    TRUE ~ "PASS"))
+}
 
+### Function compares df.qccheck records (in the format at the end of WIT processing before importing) to historical min/max and percentiles
 QCCHECK <- function(df.qccheck, file, ImportTable){
 
 ### FETCH CACHED DATA FROM WAVE RDS FILES ####
   
-  files <-  c("df_wach_param.rds", "trib_wach_summary.rds")
+  files <-  c("trib_wach_summary.rds")
   
   datadir <- paste0(user_root, config[["DataCache"]])
   rds_files <- list.files(datadir, full.names = F , pattern = ".rds")
@@ -42,9 +51,13 @@ QCCHECK <- function(df.qccheck, file, ImportTable){
   
   # Get dataframe for duplicate/blank locations
   dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
-
+  df_wach_param <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
   dbDisconnect(con)
   rm(con)
+  
+### Drop Edit_timestamp from tblParameters
+  df_wach_param <- df_wach_param %>%
+    select(-Edit_timestamp)
   
 ### Create empty dataframes for QC results with output column names
 statoutliers <- df.qccheck[NULL,names(df.qccheck)]
@@ -171,16 +184,6 @@ dups_combined <- inner_join(dups, df.qccheckNOgauge.date, by=c("Date","Location"
 
 ### Calculating RPD for bacteria dups
 
-#Create function for evaluating bacteria RPD
-BACT_DUP_TEST <- function(TribResult, DupResult, RPD){
-  if_else((abs(TribResult - DupResult) <= 50), "PASS",
-          case_when((TribResult > 5000 | DupResult > 5000) & RPD >= 5 ~ "FAIL",
-                    (TribResult > 500 | DupResult > 500) & RPD >= 10 ~ "FAIL",
-                    (TribResult > 50 | DupResult > 50) & RPD >= 20 ~ "FAIL",
-                    RPD >= 30 ~ "FAIL",
-                    TRUE ~ "PASS"))
-}
-
 # Analyze bacteria dups
 bact_dups <- dups_combined %>% 
   filter(Parameter == "E. coli") %>%
@@ -232,12 +235,14 @@ blanks <- inner_join(blanks, blank_df_rename, by=c("Date","Blank")) %>%
   rename(Location = MWRA_Location) 
 
 #Calculate whether blanks fail
-blanks <- blanks %>% mutate(
-                      Pass = case_when(
-                        (Parameter=="Turbidity NTU" & FinalResult >=1) ~ "FAIL",
-                        (str_detect(blanks$ResultReported,"<")==FALSE) ~ "FAIL",
-                          TRUE ~ "PASS")
-                            )
+blanks <- blanks %>% 
+  # rowwise %>% 
+  mutate(
+    Pass = case_when(
+      (Parameter =="Turbidity NTU" & FinalResult >=1) ~ "FAIL",
+      (str_detect(ResultReported,"<")==FALSE) ~ "FAIL",
+      TRUE ~ "PASS")
+  )
 # Get only failed blanks
 blanks_fail <- filter(blanks, Pass == "FAIL") %>%
   dplyr::rename(ID = ID.x,
@@ -245,7 +250,6 @@ blanks_fail <- filter(blanks, Pass == "FAIL") %>%
 }else{
   #If there are no blanks, make empty dataframe for failed blanks
   blanks_fail <- as.data.frame(NULL)}
-
 
 ### Print results of outlier check to unique WIT log
 QC_log_dir <- paste0(wach_team_root, config[["QC_Logfiles"]])
