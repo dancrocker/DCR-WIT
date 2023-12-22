@@ -429,11 +429,32 @@ server <- function(input, output, session) {
             dfs()[[3]]
         })
   
+  ### Get the min and max dates/datetimes from df.wq
+  
+
+  min_dt_data <- reactive({  
+    req(df.wq())
+    if ("DateTimeET" %in% names(df.wq())) {
+      min(as_date(df.wq()$DateTimeET), na.rm = TRUE)
+    } else {
+      min(df.wq()$SampleDate, na.rm = TRUE)
+    }
+  })
+  
+  max_dt_data <- reactive({
+    req(df.wq())
+    if ("DateTimeET" %in% names(df.wq())) {
+      max(as_date(df.wq()$DateTimeET), na.rm = TRUE)
+    } else {
+      max(df.wq()$SampleDate, na.rm = TRUE)
+    }
+  })
+  
   unmatchedtimes  <- reactive({
     req(dfs())
     req(ds()[[1]] == "Trib-Transect (WATMDC-WATTRB-WATTRN)")
-         dfs()[[4]]
-        })
+    dfs()[[4]]
+  })
   
   ### Import Email Message ####
   qcpath <- reactive({
@@ -448,18 +469,21 @@ server <- function(input, output, session) {
   observeEvent(input$import, {
     if(file.exists(paste0(config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
       reactive_emailmsg(
-        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file,"</p>
-               <p>Warning: Quality control outliers found in imported data. See QC Log <a href=",qcpath(),">",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
+        paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file, 
+               " for data between the dates of ", min_dt_data()," and ", min_dt_data(),"</p>
+               <p>Warning: Quality control outliers found in imported data. See QC Log <a href=", qcpath(),">", 
+               ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
         )
       reactive_emailsubject(
         paste0("New Data has been Imported to a ", userlocation," Database with QC Warning")
       )
     } else {
+      ### Need to develop options for the different date/time possiblities for the different data sets
       reactive_emailmsg(
           paste0("<body><p>",username," has imported ", nrow(df.wq()), 
             " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", 
-            input$file, "for data between the dates of ", min(as.Date(df.wq()$DateTimeET), na.rm = TRUE),
-            " and ", max(as.Date(df.wq()$DateTimeET), na.rm = TRUE), "</p></body>")
+            input$file, ", for data between the dates of ", min_dt_data(),
+            " and ", max_dt_data(), ".</p></body>")
       )
       reactive_emailsubject(
         paste0("New Data has been Imported to a ", userlocation," Database")
@@ -500,13 +524,10 @@ server <- function(input, output, session) {
     }
   })
 
-
   # Text Output
   output$text.process.status <- renderText({
     process.status()
     })
-  
-
   
   # Show import button and tables when process button is pressed
   # Use of req() later will limit these to only show when process did not create an error)
@@ -515,7 +536,6 @@ server <- function(input, output, session) {
     # show('table.process.wq')
     # show('table.process.flag')
   })
-  
 
   busyModal <- function(msg){
     modalDialog(
@@ -529,8 +549,8 @@ server <- function(input, output, session) {
     )
   }
   
-### Import UI ####
-
+  ### Import UI ####
+  
   # Import Action Button - Will only be shown when a file is processed successfully
   output$import.UI <- renderUI({
     req(try(df.wq()))
@@ -556,7 +576,7 @@ server <- function(input, output, session) {
                     error=function(cond) {
                       msg <<- paste("Import Failed - There was an error at ", Sys.time() ,
                                     "...\n ", cond)
-                      # print(msg)
+                      print(msg)
                       return(1)
                     },
                     warning=function(cond) {
@@ -568,39 +588,36 @@ server <- function(input, output, session) {
                       message(paste("Import Process Complete ..."))
                     }
     )
-
-          # ImportFailed <- is.na(out)
-
-          if (out == 1) {
-            removeModal()
-            print(msg)
-            import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
-          } else {
-            print(paste0("Data Import Successful at ", Sys.time()))
-            if (input$datatype %in% c("Nutrients (MDCMTH)", "Profiles", "Phytoplankton")){
-              import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
-                input$datatype, " | Filename = ", input$file, " for sample date(s) of: ,", df.wq$SampleDate[1])
-            } else {
-              import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
-                                  input$datatype, " | Filename = ", input$file)
-          }
-            NewCount <- actionCount() + 1
-            actionCount(NewCount)
-            new_rds_list <- c(paste0(rdsList()), rds_updates())
-            rdsList(unique(new_rds_list))
-            print(paste0("Action Count is ", actionCount()))
-            print(paste0("RDS functions to call: ", rdsList()))
-            ImportEmail()
-          }
-          removeModal()
-          if (length(which(df.wq()$Location =="MISC"))>0) {
-            showModal(modalDialog(
-              title = "Warning: MISC Sample(s) Imported",
-              HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
-            ))
-          }
+    
+    # ImportFailed <- is.na(out)
+    
+    if (out == 1) {
+      removeModal()
+      print(msg)
+      import_msg <<- paste0(msg, "\n... Check log file and review raw data files and existing database records.")
+    } else {
+      print(paste0("Data Import Successful at ", Sys.time()))
+      ### import message with the different date/datetime columns of the different datasets
+      import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
+                            input$datatype, " | Filename = ", input$file, " for sample date(s) between: ", 
+                            min_dt_data()," and ", max_dt_data(),".")
+      NewCount <- actionCount() + 1
+      actionCount(NewCount)
+      new_rds_list <- c(paste0(rdsList()), rds_updates())
+      rdsList(unique(new_rds_list))
+      print(paste0("Action Count is ", actionCount()))
+      print(paste0("RDS functions to call: ", rdsList()))
+      ImportEmail()
+    }
+    removeModal()
+    if (length(which(df.wq()$Location =="MISC"))>0) {
+      showModal(modalDialog(
+        title = "Warning: MISC Sample(s) Imported",
+        HTML("<h4>Data import was successful.<br/>At least one MISC sample was imported.<br/>Add the locations of all MISC samples to tblMiscSample.</h4>")
+      ))
+    }
   })
-
+  
   ImportEmail <- function() {
     out <- tryCatch(
       message("Trying to send email"),
