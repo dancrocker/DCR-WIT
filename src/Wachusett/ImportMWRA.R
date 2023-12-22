@@ -388,9 +388,22 @@ if(nrow(blanks)>0) {
     rename(Location = MWRA_Location,
            UniqueID_QC = UniqueID) 
   
-  # Blanks Pass if a less than is in result, otherwise Fail. Blanks should be less than minimum detection limit
+  # Blanks fail if greater than given value, else they pass. Values are mostly the low end of the "dynamic range" in MWRA SOPs
   blanks <- blanks %>% 
-    mutate(Pass = ifelse(is.na(FlagCode), "FAIL", ifelse(FlagCode == 104, "PASS", "FAIL")))
+    mutate(Pass = 
+             case_when((FinalResult > 1 & Parameter == "Turbidity NTU") ~ "FAIL",
+                       (FinalResult > 10 & Parameter == "E. coli") ~ "FAIL",
+                       (FinalResult > 0.5 & Parameter == "Alkalinity") ~ "FAIL",
+                       (FinalResult > 0.005 & Parameter == "Ammonia-N") ~ "FAIL",
+                       (FinalResult > 0.5 & Parameter == "Chloride") ~ "FAIL",
+                       (FinalResult > 0.005 & Parameter == "Mean UV254") ~ "FAIL",
+                       (FinalResult > 0.005 & Parameter == "Nitrate-N") ~ "FAIL",
+                       (FinalResult > 0.005 & Parameter == "Nitrite-N") ~ "FAIL",
+                       (FinalResult > 1 & Parameter == "Total Organic Carbon") ~ "FAIL",
+                       (FinalResult > 0.1 & Parameter == "Total Kjeldahl Nitrogen") ~ "FAIL",
+                       (FinalResult > 0.005 & Parameter == "Total Phosphorus") ~ "FAIL",
+                       (FinalResult > 5 & Parameter == "Total Suspended Solids") ~ "FAIL",
+                       TRUE ~ "PASS"))
 
   
   # Get only failed blanks
