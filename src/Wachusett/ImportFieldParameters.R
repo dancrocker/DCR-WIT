@@ -362,7 +362,7 @@ return(dfs)
 # Write data to Database ####
 ############################.
 # NOTE: file is just the filename, path = full path to file
-IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db , processedfolder, ImportTable, ImportFlagTable = NULL){
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db , processedfolder, ImportTable, ImportFlagTable = NULL){
   start <- now()
   print(glue("Starting data import at {start}"))
   ### Connect to Database   
@@ -375,11 +375,15 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL , path, file, filename.db , proce
   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
 
   ### Move Field Parameter csv files to the processed data folder ####
-  print("Moving staged field parameter csv files to the imported folder...")
+  print(glue("Moving staged field parameter csv file ({file}) to the imported folder..."))
   # Move the raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
-  dir.create(processed_dir)
+ 
+   if(!file.exists(processed_dir)) {
+    dir.create(processed_dir)
+   }
+  
   file.rename(path, paste0(processed_dir,"/", file))
   
     # Flag data
