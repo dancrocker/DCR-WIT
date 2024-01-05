@@ -370,10 +370,27 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db , proces
   database <- "DCR_DWSP"
   schema <- 'Wachusett'
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
+  ### Connect to Database 
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable),value = df.wq, append = TRUE, row.names = FALSE)
+  })
  
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
-
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    poolWithTransaction(pool, function(conn) {
+      pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportFlagTable), value = df.flags, append = TRUE, row.names = FALSE)
+    })
+  } else {
+    print("There were no flags to import")
+  }
+  
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
+  
   ### Move Field Parameter csv files to the processed data folder ####
   print(glue("Moving staged field parameter csv file ({file}) to the imported folder..."))
   # Move the raw data file to the processed folder ####
@@ -386,21 +403,9 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db , proces
   
   file.rename(path, paste0(processed_dir,"/", file))
   
-    # Flag data
-  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
-  } else {
-    print("There were no flags to import")
-  }
-  
-  # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
-  
   end <- now()
   return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
  }
-
 
 # IMPORT_DATA(df, df.flags, path, file, filename.db, processedfolder = NULL, ImportTable, ImportFlagTable = NULL)
 ### END

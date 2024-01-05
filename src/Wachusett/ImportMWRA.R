@@ -679,20 +679,24 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   schema <- 'Wachusett'
   tz <- 'America/New_York'
   ### Connect to Database 
-  con <- dbConnect(odbc::odbc(), dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
-
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable),value = df.wq, append = TRUE, row.names = FALSE)
+  })
+  
   ### Flag data ####
-   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-     odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
-   } else {
-     print("There were no flags to import")
-   }
-
-  # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    poolWithTransaction(pool, function(conn) {
+      pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportFlagTable), value = df.flags, append = TRUE, row.names = FALSE)
+    })
+  } else {
+    print("There were no flags to import")
+  }
+  
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
 
   ### Move the processed raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
