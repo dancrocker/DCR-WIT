@@ -243,7 +243,7 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 #           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
 
 # Import the data to the database
-odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+odbc::dbWriteTable(con, DBI::Id(schema = schema, table = ImportTable), value = df.wq, append = TRUE)
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)
