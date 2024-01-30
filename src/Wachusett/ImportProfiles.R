@@ -288,16 +288,15 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   
   if(is.null(df.secchi)){
     print("No Secchi data. No records imported.")
-  }else{
+  } else {
     secchi.names <- dbListFields(con, schema_name = schema, name = 'tbl_Secchi')
     df.secchi <- select(df.secchi, secchi.names[2:10])
-    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.tbl_Secchi")), value = df.secchi, append = TRUE)
+    odbc::dbWriteTable(con, DBI::Id(schema = schema, table = 'tbl_Secchi'), value = df.secchi, append = TRUE)
     print(glue("{df.secchi$Date} Secchi value of {df.secchi$Depth_ft} imported."))
     
   }
-  
-  
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+
+  odbc::dbWriteTable(con, DBI::Id(schema = schema, table = ImportTable), value = df.wq, append = TRUE)
   
   # Disconnect from db and remove connection obj
   dbDisconnect(con)
