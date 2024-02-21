@@ -71,13 +71,18 @@ IMPORT_DATA <- function(flag.db = flag.db, flagtable = flagtable, df.manualflags
   print(glue("Starting data import at {start}"))
   
   dsn <- flag.db
-  database <- "DCR_DWSP"
-  schema <- userlocation
-  tz <- 'UTC'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{flagtable}")), value = df.manualflags, append = TRUE)
-  dbDisconnect(con)
-  rm(con)
+  schema <- 'Quabbin'
+  tz <- 'America/New_York'
+  ### Connect to Database 
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = flagtable), value = df.manualflags, append = TRUE, row.names = FALSE)
+  })
+  
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
   
   end <- now()
   return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  

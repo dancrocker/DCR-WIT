@@ -446,23 +446,18 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   
   # Establish db connection
   dsn <- filename.db
-  database <- "DCR_DWSP"
   schema <- 'Quabbin'
   tz <- 'America/New_York'
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  # Get Import Table Columns
-  ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
+  # Import the data to the database
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable),value = df.wq, append = TRUE, row.names = FALSE)
+  })
   
-  # # Set variable types
-  # varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-  # sqlSave(con, df.wq, tablename = ImportTable, append = T,
-  #         rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-  
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
-  
-  # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
   
   ### Move the processed raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year

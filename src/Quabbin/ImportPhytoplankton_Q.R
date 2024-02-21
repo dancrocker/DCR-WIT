@@ -239,27 +239,20 @@ return(dfs)
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   # df.flags is an optional argument  - not used for this dataset
 
-# Establish db connection
+  # Establish db connection
   dsn <- filename.db
-  database <- "DCR_DWSP"
   schema <- 'Quabbin'
   tz <- 'America/New_York'
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)# Get Import Table Columns
-
-  ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
-
-# # Set variable types -- not necessary because specified above?
-# varTypes  <- as.character(ColumnsOfTable$TYPE_NAME)
-# sqlSave(con, df.wq, tablename = ImportTable, append = T,
-#           rownames = F, colnames = F, addPK = F , fast = F, varTypes = varTypes)
-
-# Import the data to the database
-odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
-
-# Disconnect from db and remove connection obj
-dbDisconnect(con)
-rm(con)
+  # Import the data to the database
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable),value = df.wq, append = TRUE, row.names = FALSE)
+  })
+  
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
 
   return("Import Successful")
 }
