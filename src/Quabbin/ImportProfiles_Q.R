@@ -282,12 +282,11 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   # Establish db connection
   dsn <- filename.db
-  database <- "DCR_DWSP"
   schema <- 'Quabbin'
   tz <- 'America/New_York'
-  
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)  # Get Import Table Columns
-  ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+ 
+   # ColumnsOfTable <- dbListFields(con, schema = schema, ImportTable)
   
   # # assign df.secchi to correct value. NULL if no data, clean record if present
   # df.secchi <- GET_SECCHI(path,file)
@@ -301,12 +300,14 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   #   odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.tbl_Secchi")), value = df.secchi, append = TRUE)
   #   print(glue("{df.secchi$Date} Secchi value of {df.secchi$Depth_ft} imported."))
   # }
-  
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
-  
-  # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable),value = df.wq, append = TRUE, row.names = FALSE)
+  })
+
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
 
   return("Import Successful")
 }
