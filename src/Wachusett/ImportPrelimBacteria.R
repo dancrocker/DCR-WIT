@@ -347,12 +347,39 @@ df.wq <- df.wq %>% select(-c(Description,
 col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq %>% select(all_of(col.order.wq))
 
+########################################################################.
+###                          High bacteria samples for email        ####
+########################################################################.
+
+### Get bacteria values that are above 235 and above a multiplier of the mean of all bacteria samples for the day
+
+### Daily mean multiplier
+meanmult <- 2 # Change multiplier if more/less extreme outliers are wanted 
+
+if(max(df.wq$FinalResult)>235){
+  df.wq.means <- df.wq %>% filter(!Location == "MISC") %>%
+                            mutate(Date=as_date(DateTimeET)) %>%
+                            group_by(Date) %>%
+                            summarise(DayMean = round(mean(FinalResult),1))
+
+  bact_high <- df.wq %>% 
+    filter(FinalResult > 235,
+           !Location == "MISC") %>%
+    mutate(Date = as_date(DateTimeET)) %>%
+    left_join(.,df.wq.means, by="Date") %>%
+    filter(FinalResult > DayMean*meanmult) 
+    
+}else{
+  bact_high <- df.wq[NULL, names(df.wq)]
+  
+}
 
 # Create a list of the processed datasets
 dfs <- list()
 dfs[[1]] <- df.wq
 dfs[[2]] <- path
 dfs[[3]] <- df.flags
+dfs[[4]] <- bact_high
 
 # Disconnect from db and remove connection obj
 dbDisconnect(con)

@@ -456,6 +456,12 @@ server <- function(input, output, session) {
     dfs()[[4]]
   })
   
+  bact_high  <- reactive({
+    req(dfs())
+    req(ds()[[1]] == "Preliminary Bacteria (WATTRB-WATTRN)")
+    dfs()[[4]]
+  })
+  
   ### Import Email Message ####
   qcpath <- reactive({
     paste0("file:///", str_replace_all(config[["QC_Logfiles"]],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
@@ -492,6 +498,72 @@ server <- function(input, output, session) {
   }, ignoreInit = TRUE)
     
 
+### High bacteria email
+
+  bact_emailmsg <- reactiveVal(
+    ""
+  )
+  bact_emailsubject <- reactiveVal(
+    ""
+  ) 
+  
+  observeEvent(input$import, {
+  
+  if (ds()[[1]] == "Preliminary Bacteria (WATTRB-WATTRN)"){
+    if(nrow(bact_high())> 0){
+  
+      bact_high_dates <- reactive({bact_high() %>% distinct(Date, .keep_all = TRUE)})
+      
+      bact_emailmsg(
+        paste0("<body><p>The following high preliminary bacteria values from the file ",input$file," were imported to the ",userlocation," database:<br>", 
+               paste0(bact_high()$Location, ": ", bact_high()$FinalResult, " ",bact_high()$Units, " on ",bact_high()$Date, sep="", collapse="<br>"),
+               "
+               <br><br></p>
+               <p> These values are >200% of the mean of sample day bacteria values for all sites as follows:<br>", 
+               paste0("Mean of ",bact_high_dates()$DayMean, " ",bact_high_dates()$Units, " for all sites on ",bact_high_dates()$Date, sep="", collapse="<br>"),
+               "
+               <br><br></p>
+               <p> Review data/conditions to determine if follow-up sampling or field investigations are warranted.</p></body>"
+         ))
+      bact_emailsubject(
+        paste0("High Preliminary Bacteria Results Present in Imported ", userlocation," Data")
+      )
+    }
+  }
+  }, ignoreInit = TRUE)
+  
+  BactEmail <- function() {
+    out <- tryCatch(
+      message("Trying to send high bacteria warning email"),
+      OL_EMAIL(to = distro1(), 
+               subject = bact_emailsubject(),
+               body = bact_emailmsg()
+      ),
+      
+      ### SMTP METHOD (ONLY WORKS WHEN McAfee GROUP POLICY ALLOWS)  
+      # sendmail(from = paste0("<",useremail,">"),
+      #          to = distro1(),
+      #          subject = paste0("New Data has been Imported to a ", userlocation," Database"),
+      #          msg = paste0(username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",
+      #                       input$datatype, " | Filename = ", input$file),
+      #          control=list(smtpServer=MS))
+      
+      error=function(cond) {
+        message(paste("There was an error trying to send the high bacteria email", cond))
+        return(1)
+      },
+      warning=function(cond) {
+        message(paste("Send mail function for high bacteria email caused a warning, but was completed successfully", cond))
+        return(2)
+      },
+      finally={
+        message(paste("High bacteria email notification attempt completed"))
+      }
+    )
+    return(out)
+  }
+  
+  
   ### Last File to be Processed
   file.processed <- eventReactive(input$process, {
     input$file
@@ -601,6 +673,7 @@ server <- function(input, output, session) {
       import_msg <<- paste0("Successful import of ", nrow(df.wq()), " new record(s) for the dataset: ",
                             input$datatype, " | Filename = ", input$file, " for sample date(s) between: ", 
                             min_dt_data()," and ", max_dt_data(),".")
+      
       NewCount <- actionCount() + 1
       actionCount(NewCount)
       new_rds_list <- c(paste0(rdsList()), rds_updates())
@@ -608,6 +681,13 @@ server <- function(input, output, session) {
       print(paste0("Action Count is ", actionCount()))
       print(paste0("RDS functions to call: ", rdsList()))
       ImportEmail()
+      if (ds()[[1]] == "Preliminary Bacteria (WATTRB-WATTRN)"){
+        if(nrow(bact_high())> 0){
+          BactEmail()
+        }
+      }
+
+      
     }
     removeModal()
     if (length(which(df.wq()$Location =="MISC"))>0) {
