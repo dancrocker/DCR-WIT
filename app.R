@@ -12,7 +12,7 @@
 # Notes:
 #   1. If running locally the config file must be loaded first (see WAVE_WIT_Local script)
 
-options(shiny.reactlog = TRUE) # This is a visual representation of reactivity
+# options(shiny.reactlog = TRUE) # This is a visual representation of reactivity
 
 #######################################################################.
 ###    Load Libraries and Script (Sources, Modules, and Functions)  ####
@@ -535,7 +535,7 @@ server <- function(input, output, session) {
   BactEmail <- function() {
     out <- tryCatch(
       message("Trying to send high bacteria warning email"),
-      OL_EMAIL(to = distro1(), 
+      OL_EMAIL(to = paste(distro1(), userdata$Email[2], sep = "; " ), 
                subject = bact_emailsubject(),
                body = bact_emailmsg()
       ),
