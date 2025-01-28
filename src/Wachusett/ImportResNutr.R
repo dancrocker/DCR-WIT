@@ -377,30 +377,34 @@ return(dfs)
 ###                    Write data to Database                       ####
 ########################################################################.
 
-IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder,ImportTable, ImportFlagTable = NULL){
-  
+IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL){
   start <- now()
+  print(glue("Starting data import at {start}"))
+  ### CONNECT TO DATABASE ####
+  ### Set DB
   dsn <- filename.db
   database <- "DCR_DWSP"
   schema <- 'Wachusett'
   tz <- 'America/New_York'
+  ### Connect to Database 
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-
-  # Import the data to the database - Need to use RODBC methods here. Tried odbc and it failed
-
-  odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportTable}")), value = df.wq, append = TRUE)
+  poolWithTransaction(pool, function(conn) {
+    pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable), value = df.wq, append = TRUE, row.names = FALSE)
+  })
   
-   ### Flag data ####
+  ### Flag data ####
   if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
-    odbc::dbWriteTable(con, DBI::SQL(glue("{database}.{schema}.{ImportFlagTable}")), value = df.flags, append = TRUE)
+    poolWithTransaction(pool, function(conn) {
+      pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportFlagTable), value = df.flags, append = TRUE, row.names = FALSE)
+    })
   } else {
     print("There were no flags to import")
   }
-
-  # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  
+  #* Close the database pool ----
+  poolClose(pool)
+  rm(pool)
 
   #Move the processed raw data file to the processed folder
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
@@ -411,7 +415,6 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
   file.rename(path, paste0(processed_dir,"/", file))
   end <- now()
   return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
-  
 }
 ### END
 
