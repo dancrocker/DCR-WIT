@@ -21,8 +21,14 @@
 print(paste0("WIT App lauched at ", Sys.time()))
 
 ### Load packages
+# Specify Library path from launch script
+if(exists("rportable_library")){
+  r_lib <- .libPaths()[1]
+} else {
+  r_lib <- config[["R_lib_Path"]]
+}
 
-if (!"RDCOMClient" %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"]) {
+if (!"RDCOMClient" %in% installed.packages(lib.loc = r_lib)[, "Package"]) {
   print("RDCOMClient Package not found in library. Installing now...")
   devtools::install_github("BSchamberger/RDCOMClient")
 }
@@ -32,15 +38,15 @@ if (!"RDCOMClient" %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "
 
 
 ipak <- function(pkg){
-  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = config[["R_lib_Path"]])[, "Package"])]
+  new.pkg <- pkg[!(pkg %in% installed.packages(lib.loc = r_lib)[, "Package"])]
   if (length(new.pkg))
-    install.packages(new.pkg, lib = config[["R_lib_Path"]], dependencies = TRUE, repos="http://cran.rstudio.com/")
+    install.packages(new.pkg, lib = r_lib, dependencies = TRUE, repos = "https://cloud.r-project.org")
   sapply(pkg, require, character.only = TRUE)
 }
 
 packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "tidyverse", "odbc", "DBI", "lubridate",
               "DescTools", "devtools", "scales", "data.table", "magrittr", "stringr", "openxlsx", "V8", "installr", "data.table", 
-              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "rdrop2", "callr", "stringi", "RDCOMClient", "pool")
+              "dataRetrieval","httpuv", "rlang", "shinycssloaders", "glue", "httr", "DT", "callr", "stringi", "RDCOMClient", "pool")
 
 # Load-Install Packages
 ipak(packages)
@@ -109,7 +115,7 @@ actionCount <- reactiveVal(0)
 rdsList <- reactiveVal(NULL)
 
 ### Set UI Theme ####
-mytheme <- "spacelab"
+mytheme <- "simplex"
 ########################################################################.
 ###                      User Interface                             ####
 ########################################################################.

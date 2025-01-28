@@ -108,12 +108,11 @@ if(sensor =="YSI Pro Plus") {
     select(-c("Date", "Time"))
 }
 
-### Connect to Database ####  
+### Create a database pool connection using App credentials ----
 dsn <- "DCR_DWSP_App_R"
-database <- "DCR_DWSP"
-schema <- 'Wachusett'
-tz <- 'UTC'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+tz <- "America/New_York"
+tz_out <- "America/New_York"
+pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[['DB Connection PW']], timezone = tz, timezone_out = tz_out)
 
 ### Load tables from SQL Server ####
 params <- dbReadTable(con, Id(schema = schema, table = "tblParameters"))
@@ -132,8 +131,6 @@ df$DateTimeET <- ifelse(df$Location == "MD04",
                         ifelse(df$Location %in% flowlocations$LocationMWRA,
                                round_date(df$DateTimeET, "15 minutes"),
                                df$DateTimeET))
-
-df$DateTimeET <- as_datetime(df$DateTimeET) %>% with_tz("America/New_York")
 
 ### Fix location names ####
 df$Location %<>%
@@ -369,8 +366,10 @@ dfs[[1]] <- df
 dfs[[2]] <- filepath
 dfs[[3]] <- df.flags
 # Disconnect from db and remove connection obj
-dbDisconnect(con)
-rm(con)
+# Close the database pool ----
+poolClose(pool)
+rm(pool)
+
 return(dfs)
 } # END FUNCTION
 

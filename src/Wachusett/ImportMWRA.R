@@ -16,13 +16,13 @@
 # library(tidyverse)
 # library(stringr)
 # library(odbc)
-# library(RODBC)
 # library(DBI)
 # library(lubridate)
 # library(magrittr)
 # library(readxl)
-# library(testthat)
 # library(glue)
+# library(pool)
+# library(dbplyr)
 
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
@@ -78,7 +78,8 @@ dsn <- filename.db
 database <- "DCR_DWSP"
 schema <- "Wachusett"
 tz <- 'America/New_York'
-con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+tz_out <- 'America/New_York'
+pool <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 ########################################################################.
 ###                     START REFORMATTING THE DATA                 ####
@@ -112,7 +113,6 @@ names(df.wq) <-  c("SampleGroup",
                  "DetectionLimit")
 
 
-
 ### Date and Time ####
 
 # Split the Sample time into date and time
@@ -123,6 +123,10 @@ df.wq <- separate(df.wq, SampleTime, into = c("date", "Time"), sep = " ")
 
 # Merge the actual date column with the new Time Column and reformat to POSIXct
 df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format ="%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
+
+# Set date-time bounds of import dataset for future queries
+min_dt <- min(df.wq$DateTimeET, na.rm = TRUE)
+max_dt <- max(df.wq$DateTimeET, na.rm = TRUE)
 
 ### Fix other data types ####
 df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -148,11 +152,12 @@ if(all(!is.na(df.wq$DateTimeAnalyzedET))) {
 } else {
   df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
 }
+
 ### Fix the Parameter names ####  - change from MWRA name to ParameterName
-params <- dbReadTable(con,  Id(schema = schema, table = "tblParameters"))
+params <- dbReadTable(pool,  Id(schema = schema, table = "tblParameters"))
 df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
-### Remove records with missing elements/uneeded data ####
+
 # Delete possible Sample Address rows (Associated with MISC Sample Locations):
 df.wq <- df.wq %>%  # Filter out any sample with no results (There shouldn't be, but they do get included sometimes)
   filter(!is.na(Parameter),
@@ -207,13 +212,26 @@ if (length(dupes) > 0){
              "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
 }
 ### Make sure records are not already in DB ####
+### Lazy table query with dbplyr (using existing pool connection) ----
+### A. Read an entire table using with dbplyr (using existing pool connection) ####
+Uniq_qry <- tbl(pool, in_schema(schema, ImportTable), check_from = FALSE) 
 
-Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
-flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
-dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
+Uniq <- Uniq_qry |> 
+  filter(DateTimeET >= min_dt ,
+         DateTimeET <= max_dt) |> 
+  collect()
+
+### keep as dataframe because we need the ID to filter out the preliminary records from the dupes
+dupes2 <- Uniq$UniqueID %in% df$UniqueID 
+
+### Get the prelim data records based on flag 102
+flags <- tbl(pool, in_schema(schema, ImportFlagTable), check_from = FALSE) |> 
+  filter(FlagCode == 102) |> 
+  collect()
+
 dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
-if (nrow(dupes2) > 0){
+if (nrow(dupes2) > 0) {
   # Exit function and send a warning to user
   stop(paste("This data file contains", nrow(dupes2),
              "records that appear to already exist in the database!
@@ -222,7 +240,7 @@ Eliminate all duplicates before proceeding.",
 }
 rm(Uniq)
 
-### DataSource ####
+### Mutate Additional metadata columns ####
 df.wq <- df.wq %>% 
   mutate(DataSource = paste0("MWRA_", file),
          Imported_By = username,
