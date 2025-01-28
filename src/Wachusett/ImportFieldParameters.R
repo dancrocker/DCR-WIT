@@ -112,6 +112,7 @@ if(sensor =="YSI Pro Plus") {
 dsn <- "DCR_DWSP_App_R"
 tz <- "America/New_York"
 tz_out <- "America/New_York"
+database <- "DCR_DWSP"
 pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[['DB Connection PW']], timezone = tz, timezone_out = tz_out)
 
 ### Load tables from SQL Server ####
@@ -123,6 +124,9 @@ ratings <- dbReadTable(pool, Id(schema = schema, table = "tblRatings"))
 ### Populate Units Column ####
 df$Units <- params$ParameterUnits[match(df$Parameter, params$ParameterName)]
 
+
+df$DateTimeET <- as_datetime(df$DateTimeET)
+
 ### Round Times ####
 df$DateTimeET <- round_date(df$DateTimeET, "minute") 
 
@@ -130,7 +134,7 @@ df$DateTimeET <- ifelse(df$Location == "MD04",
                         round_date(df$DateTimeET, "10 minutes"),
                         ifelse(df$Location %in% flowlocations$LocationMWRA,
                                round_date(df$DateTimeET, "15 minutes"),
-                               df$DateTimeET))
+                               df$DateTimeET)) %>% as_datetime()
 
 ### Fix location names ####
 df$Location %<>%
