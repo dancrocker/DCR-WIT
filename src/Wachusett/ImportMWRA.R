@@ -44,7 +44,6 @@ df.wq <- df.wq[,c(1:25)]
 # Source WITQCTEST
 source("src/Functions/WITQCTEST.R", local = TRUE)
 
-
 ########################################################################.
 ###                        Perform Data checks                      ####
 ########################################################################.
@@ -214,7 +213,7 @@ if (length(dupes) > 0){
 ### Make sure records are not already in DB ####
 ### Lazy table query with dbplyr (using existing pool connection) ----
 ### A. Read an entire table using with dbplyr (using existing pool connection) ####
-Uniq_qry <- tbl(pool, in_schema(schema, ImportTable), check_from = FALSE) 
+Uniq_qry <- tbl(pool, DBI::Id(schema = schema, ImportTable), check_from = FALSE) 
 
 Uniq <- Uniq_qry |> 
   filter(DateTimeET >= min_dt ,
@@ -222,15 +221,17 @@ Uniq <- Uniq_qry |>
   collect()
 
 ### keep as dataframe because we need the ID to filter out the preliminary records from the dupes
-dupes2 <- Uniq$UniqueID %in% df$UniqueID 
+
+dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 
 ### Get the prelim data records based on flag 102
-flags <- tbl(pool, in_schema(schema, ImportFlagTable), check_from = FALSE) |> 
+flags <- tbl(pool, DBI::Id(schema = schema, ImportFlagTable), check_from = FALSE) |> 
   filter(FlagCode == 102) |> 
   collect()
 
-dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
+dupes2 <- Uniq[!Uniq$ID %in% flags$SampleID,]
 
+# take out any preliminary samples (they should get overwritten during import)
 if (nrow(dupes2) > 0) {
   # Exit function and send a warning to user
   stop(paste("This data file contains", nrow(dupes2),
@@ -317,12 +318,11 @@ dups <- df.wq %>% filter(Location %in% c("WFD1","WFD2","WFD3")) %>%
   mutate(Date = as.Date(DateTimeET))
 
 # Get table to find which sites duplicates match with, needed for blanks too, so can't be under next If()
-dup_df <- dbReadTable(con, Id(schema = schema, table = "tbl_Field_QC"))
+dup_df <- dbReadTable(pool, Id(schema = schema, table = "tbl_Field_QC"))
 
 # Only proceed if there are duplicates
 if(nrow(dups)>0) {
   
-
   dup_df_rename <- dup_df %>% rename(Duplicate = Dup_Blank_code)
   
   # Create temporary dataframe to match regular samples with dups
@@ -462,7 +462,7 @@ df.wq$ImportDate <- Sys.Date() %>% force_tz("America/New_York")
 ########################################################################.
 
 ### Get Locations table to generate list of applicable locations
-locations <- dbReadTable(con,  Id(schema = schema, table = "tblWatershedLocations"))
+locations <- dbReadTable(pool,  Id(schema = schema, table = "tblWatershedLocations"))
 
 ### Filter down to only locations with preliminary bacteria (Primary/secondary Tribs and Transect)
 prelim_locs <- locations %>% 
@@ -476,7 +476,7 @@ datemax <- max(df.wq$DateTimeET)
 
 # IDs to look for - all records in time period in question
 qry <- glue("SELECT [ID],[Location] FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
-query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
+query.prelim <- dbGetQuery(pool, qry) # This generates a list of possible IDs
 
 query.prelim <- query.prelim %>% 
   filter(Location %in% prelim_locs) %>% 
@@ -485,18 +485,18 @@ query.prelim <- query.prelim %>%
 if (length(query.prelim) > 0) {# If true there is at least one record in the time range of the data
   # SQL query that finds matching record ID from tblSampleFlagIndex Flagged 102 within date range in question
   qryS <- sprintf("SELECT [SampleID] FROM [Wachusett].[tblTribFlagIndex] WHERE [FlagCode] = 102 AND [SampleID] IN (%s)", paste(as.character(query.prelim), collapse=', '))
-  qryDelete <- dbGetQuery(con, qryS) # Check the query to see if it returns any matches
+  qryDelete <- dbGetQuery(pool, qryS) # Check the query to see if it returns any matches
   
   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
   if(nrow(qryDelete) > 0) {
     ### Delete from flag table
     qryDeletePrelimFlags <- sprintf(glue("DELETE FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN (%s)"), paste(as.character(query.prelim), collapse=', '))
-    rs <- dbSendStatement(con, qryDeletePrelimFlags)
+    rs <- dbSendStatement(pool, qryDeletePrelimFlags)
     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
     dbClearResult(rs)
     ### Delete from tblMWRAResults
     qryDeletePrelimData <- sprintf(glue("DELETE FROM [{schema}].[{ImportTable}] WHERE [ID] IN (%s)"), paste(as.character(query.prelim), collapse=', '))
-    rs <- dbSendStatement(con,qryDeletePrelimData)
+    rs <- dbSendStatement(pool, qryDeletePrelimData)
     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
     dbClearResult(rs)
   }
@@ -509,7 +509,7 @@ if (length(query.prelim) > 0) {# If true there is at least one record in the tim
 # Read Tables
 # WQ ####
 setIDs <- function(){
-query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
+query.wq <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
 # Get current max ID
 if(is.na(query.wq)) {
   query.wq <- 0
@@ -564,7 +564,7 @@ setFlagIDs <- function(){
   
   
   if(nrow(df.flags) > 0){
-      query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
+      query.flags <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
       if(is.na(query.flags)) {
         query.flags <- 0
@@ -598,7 +598,7 @@ df.flags <- setFlagIDs()
 #Create empty dataframe
 unmatchedtimes <- df.wq[NULL, names(df.wq)]
 # Bring in tributary location IDs
-locations.tribs <- na.omit(dbGetQuery(con, glue("SELECT [LocationMWRA] FROM [{schema}].[tblWatershedLocations] WHERE [LocationType] ='Tributary'")))
+locations.tribs <- na.omit(dbGetQuery(pool, glue("SELECT [LocationMWRA] FROM [{schema}].[tblWatershedLocations] WHERE [LocationType] ='Tributary'")))
 
 # Keep only locations of type "Tributary", remove WFB2 since it will always have unmatched times
 df.timecheck <- dplyr::filter(df.wq, Location %in% locations.tribs$LocationMWRA, !Location %in% c("MISC","WFB2"))
@@ -611,7 +611,7 @@ if(nrow(df.timecheck)>0){
   # Find earliest date in df.wq
   mindatecheck <- min(df.wq$DateTimeET)
   # Retrieve all date/times from database from earliest in df.wq to present - from Field Parameter table
-  databasetimes <- dbGetQuery(con, glue("SELECT [DateTimeET], [Location] FROM [{schema}].[tblTribFieldParameters] WHERE [DateTimeET] >= '{mindatecheck}'"))  
+  databasetimes <- dbGetQuery(pool, glue("SELECT [DateTimeET], [Location] FROM [{schema}].[tblTribFieldParameters] WHERE [DateTimeET] >= '{mindatecheck}'"))  
     
   #Loop adds row for every record without matching location/date/time in database
   for (i in 1:nrow(df.timecheck)){
@@ -626,7 +626,7 @@ if(nrow(df.timecheck)>0){
 ### Print unmatchedtimes to log, if present
 if (nrow(unmatchedtimes) > 0){
   print(paste0(nrow(unmatchedtimes)," unmatched site/date/times in processed data."))
-  print(unmatchedtimes[c("ID","UniqueID","ResultReported")], print.gap = 4, right = FALSE)
+  print(unmatchedtimes[c("ID","UniqueID","ResultReported")])#, print.gap = 4, right = FALSE)
 }
 
 ########################################################################.
@@ -647,7 +647,7 @@ if (nrow(unmatchedtimes) > 0){
 # )
 
 # Reorder remaining 30 columns to match the database table exactly ####
-col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
+col.order.wq <- dbListFields(pool, schema_name = schema, name = ImportTable)
 df.wq <-  df.wq[,col.order.wq]
 
 ### QC Test ####
@@ -666,8 +666,8 @@ dfs[[3]] <- df.flags # Removed condition to test for flags and put it in the set
 dfs[[4]] <- unmatchedtimes # Samples with site/time combo not matching any record in the database
 
 # Disconnect from db and remove connection obj
-dbDisconnect(con)
-rm(con)
+dbDisconnect(pool)
+rm(pool)
 return(dfs)
 } # END FUNCTION ####
 
