@@ -61,7 +61,6 @@ pro_quatro_header <- c("Date",
                        "Probe_ID",	
                        "SampledBy")
 
-
 ### Read File ####
 
 data <- read.csv(filepath)
@@ -113,6 +112,7 @@ dsn <- "DCR_DWSP_App_R"
 tz <- "America/New_York"
 tz_out <- "America/New_York"
 database <- "DCR_DWSP"
+schema <- userlocation
 pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[['DB Connection PW']], timezone = tz, timezone_out = tz_out)
 
 ### Load tables from SQL Server ####
@@ -124,7 +124,6 @@ ratings <- dbReadTable(pool, Id(schema = schema, table = "tblRatings"))
 ### Populate Units Column ####
 df$Units <- params$ParameterUnits[match(df$Parameter, params$ParameterName)]
 
-
 df$DateTimeET <- as_datetime(df$DateTimeET)
 
 ### Round Times ####
@@ -134,7 +133,7 @@ df$DateTimeET <- ifelse(df$Location == "MD04",
                         round_date(df$DateTimeET, "10 minutes"),
                         ifelse(df$Location %in% flowlocations$LocationMWRA,
                                round_date(df$DateTimeET, "15 minutes"),
-                               df$DateTimeET)) %>% as_datetime()
+                               df$DateTimeET)) %>% as_datetime(tz = "America/New_York")
 
 ### Fix location names ####
 df$Location %<>%
@@ -382,7 +381,7 @@ return(dfs)
             # # #RUN THE FUNCTION TO PROCESS THE DATA AND RETURN 2 DATAFRAMES and path AS LIST:
             # dfs <- PROCESS_DATA(file, rawdatafolder, filename.db, probe = NULL, ImportTable, ImportFlagTable = NULL)
             # # # Extract each element needed
-            # df     <- dfs[[1]]
+            # df.wq     <- dfs[[1]]
             # path  <- dfs[[2]]
             # df.flags  <- dfs[[3]]
 ##################################################.
