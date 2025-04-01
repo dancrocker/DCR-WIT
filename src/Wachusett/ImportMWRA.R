@@ -213,7 +213,7 @@ if (length(dupes) > 0){
 ### Make sure records are not already in DB ####
 ### Lazy table query with dbplyr (using existing pool connection) ----
 ### A. Read an entire table using with dbplyr (using existing pool connection) ####
-Uniq_qry <- tbl(pool, DBI::Id(schema = schema, ImportTable), check_from = FALSE) 
+Uniq_qry <- tbl(pool, in_schema(schema = schema, table = ImportTable)) 
 
 Uniq <- Uniq_qry |> 
   filter(DateTimeET >= min_dt ,
@@ -225,7 +225,7 @@ Uniq <- Uniq_qry |>
 dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
 
 ### Get the prelim data records based on flag 102
-flags <- tbl(pool, DBI::Id(schema = schema, ImportFlagTable), check_from = FALSE) |> 
+flags <- tbl(pool, in_schema(schema = schema, table = ImportFlagTable)) |> 
   filter(FlagCode == 102) |> 
   collect()
 
