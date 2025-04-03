@@ -20,12 +20,11 @@
 
 print(paste0("WIT App lauched at ", Sys.time()))
 
-### Load packages
-# Specify Library path from launch script
-if(exists("rportable_library")){
-  r_lib <- .libPaths()[1]
-} else {
+# Specify R Library path for installing and loading packages
+if(dir.exists(config[["R_lib_Path"]])) {
   r_lib <- config[["R_lib_Path"]]
+} else {
+  r_lib <- .libPaths()[1]
 }
 
 if (!"RDCOMClient" %in% installed.packages(lib.loc = r_lib)[, "Package"]) {
