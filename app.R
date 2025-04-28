@@ -50,6 +50,16 @@ packages <- c("shiny", "shinyjs", "shinythemes", "readxl", "dplyr", "tidyr", "ti
 # Load-Install Packages
 ipak(packages)
 
+# Set user info
+user <-  Sys.getenv("USERNAME") %>% toupper()
+userdata <- readxl::read_xlsx(path = paste0(user_root, config[["Users"]]))
+userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
+username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
+useremail <- userinfo$Email[1]
+userlocation <<- userinfo$Location[1]
+usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
+schema <<- userlocation
+
 source("src/Functions/outlook_email.R", local = T)
 
 ### Set Location Dependent Variables - datatsets and distro
@@ -62,16 +72,6 @@ if (userlocation == "Wachusett") {
     filter(ImportMethod == "Importer-R")
 }
 
-# Set user info
-
-user <-  Sys.getenv("USERNAME") %>% toupper()
-userdata <- readxl::read_xlsx(path = paste0(user_root, config[["Users"]]))
-userinfo <- userdata[userdata$Username %>% toupper() == user,] %>% filter(!is.na(Username))
-username <- paste(userinfo$FirstName[1],userinfo$LastName[1],sep = " ")
-useremail <- userinfo$Email[1]
-userlocation <<- userinfo$Location[1]
-usertype <<- userinfo$UserType %>% as.numeric() # 0 = read only, 1 = SQL Server, 2 = Access
-schema <<- userlocation
 # Specify mail server
 # MS <- config[5]
 
@@ -110,6 +110,8 @@ flags$label <- paste0(flags$Flag_ID," - ", flags$FlagDescription)
 # Disconnect and remove connection
 dbDisconnect(con2)
 rm(con2)
+
+#* Create empty reactive value objects ----
 actionCount <- reactiveVal(0)
 rdsList <- reactiveVal(NULL)
 
