@@ -129,6 +129,14 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     rename(
       Site = Station,
       DateTimeET = Timestamp)
+  
+  ### QC Test ####
+  source("src/Functions/WITQCTEST.R", local = T)
+  
+  qc_message <- QCCHECK( df.qccheck = df.wq, 
+                         file = file, 
+                         ImportTable = ImportTable)
+  print(qc_message)
 
   # Create a list of the processed datasets
   dfs <- list()
