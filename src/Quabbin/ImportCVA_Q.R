@@ -471,6 +471,15 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
     pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportTable), value = df.wq, append = TRUE, row.names = FALSE)
   })
 
+  ### Flag data ####
+  if (class(df.flags) == "data.frame"){ # Check and make sure there is flag data to import 
+    poolWithTransaction(pool, function(conn) {
+      pool::dbWriteTable(pool, DBI::Id(schema = schema, table = ImportFlagTable), value = df.flags, append = TRUE, row.names = FALSE)
+    })
+  } else {
+    print("There were no flags to import")
+  }
+  
   #* Close the database pool ----
   poolClose(pool)
   rm(pool)
