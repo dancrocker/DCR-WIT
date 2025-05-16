@@ -1,9 +1,8 @@
 ##############################################################################################################################
-#     TITLE: ImportMWRA_Q.R
-#     DESCRIPTION: This script will Format/Process MWRA data to DCR
-#                  This script will process and import MWRA Projects: QRTRIB, WRTRIB, MDHEML, QR-WQM
-#     AUTHOR(S): Dan Crocker; modified by Brett Boisjolie, Travis Drury
-#     DATE LAST UPDATED: 2025/05/13
+#     TITLE: ImportCVA_Q.R
+#     DESCRIPTION: This script will Format/Process MWRA cVA data
+#     AUTHOR(S): Dan Crocker; modified by Brett Boisjolie
+#     DATE LAST UPDATED: 2022-04-12
 #     GIT REPO: WIT
 #
 ##############################################################################################################################
@@ -23,6 +22,7 @@
 # library(glue)
 # COMMENT OUT ABOVE CODE WHEN RUNNING IN SHINY!
 
+
 #############################
 #   PROCESSING FUNCTION    #
 ############################
@@ -33,25 +33,10 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Get the full path to the file
   path <- paste0(rawdatafolder, "/", file)
 
-  # Read in the data to a dataframe
+  # Read in data to a dataframe
   df.wq <- read_excel(path, sheet = 1, col_names = T, trim_ws = T, na = "nil") %>%
     as.data.frame() # This is the raw data - data comes in as xlsx file, so read.csv will not work
-
   df.wq <- df.wq[, c(1:25)]
-
-  # If file is Quabbin/CVA results, filter out CVA System results and save them to a new raw data file
-  if (grepl("^Quabbin_", file)) {
-    df.wq.cva <- df.wq %>%
-      filter(grepl("^MW-", .[[4]]))
-    raw.date <- substr(file, 8, 14)
-
-    if (nrow(df.wq.cva > 0)) {
-      write.xlsx(df.wq.cva, paste0(rawdatafolder, "/MWRA_DistributionSystem", raw.date, ".xlsx"))
-
-      df.wq <- df.wq %>%
-        filter(!grepl("^MW-", .[[4]]))
-    }
-  }
 
   # Connect to db for queries below
   ### Connect to Database
@@ -59,7 +44,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   database <- "DCR_DWSP"
   schema <- "Quabbin"
   tz <- "America/New_York"
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  pool <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
 
   #################################
@@ -142,8 +127,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   df.wq$DateTimeET <- as.POSIXct(paste(as.Date(df.wq$SampleDate, format = "%Y-%m-%d"), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M", tz = "America/New_York", usetz = T)
 
   # Import Staff
-  ImportStaff <-  username
-  
+  ImportStaff <- "DCR.Quabbin"
+
   # Fix other data types
   df.wq$EDEP_Confirm <- as.character(df.wq$EDEP_Confirm)
   df.wq$EDEP_MW_Confirm <- as.character(df.wq$EDEP_Confirm)
@@ -157,21 +142,32 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     df.wq$LabRecDateET <- as_datetime(df.wq$LabRecDateET)
   }
 
-  if (all(!is.na(df.wq$PrepOnET))) {
-    df.wq$PrepOnET <- as.POSIXct(paste(df.wq$PrepOnET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
-  } else {
-    df.wq$PrepOnET <- as_datetime(df.wq$PrepOnET)
-  }
+  # Solve timestamp issue for PrepOnET and DateTimeAnalyzedET
+  # str(df.wq)
+  # library(openxlsx)
+  # df.wq$PrepOnET <- convertToDateTime(df.wq$PrepOnET, origin = "1900-01-01")
+  # df.wq$DateTimeAnalyzedET <- convertToDateTime(df.wq$DateTimeAnalyzedET, origin = "1900-01-01")
+  #
+  # if (all(!is.na(df.wq$PrepOnET))) {
+  #   df.wq$PrepOnET <- as.POSIXct(paste(df.wq$PrepOnET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
+  # } else {
+  #   df.wq$PrepOnET <- as_datetime(df.wq$PrepOnET)
+  # }
+  #
+  # if (all(!is.na(df.wq$DateTimeAnalyzedET))) {
+  #   df.wq$DateTimeAnalyzedET <- as.POSIXct(paste(df.wq$DateTimeAnalyzedET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
+  # } else {
+  #   df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
+  # }
 
-  if (all(!is.na(df.wq$DateTimeAnalyzedET))) {
-    df.wq$DateTimeAnalyzedET <- as.POSIXct(paste(df.wq$DateTimeAnalyzedET, format = "%Y-%m-%d %H:%M:SS", tz = "America/New_York", usetz = T))
-  } else {
-    df.wq$DateTimeAnalyzedET <- as_datetime(df.wq$DateTimeAnalyzedET)
-  }
 
   ### Fix the Parameter names ####  - change from MWRA name to ParameterName
-  params <- dbReadTable(con, Id(schema = "Wachusett", table = "tblParameters"))
+  params <- dbReadTable(pool, Id(schema = "Wachusett", table = "tblParameters"))
+
   df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
+  unique(df.wq$Parameter)
+
+  df.wq <- filter(df.wq, df.wq$Parameter != "NA")
 
 
   ### Remove records with missing elements/unneeded data ####
@@ -203,24 +199,13 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   ###                           Check Duplicates                      ####
   ######################################################################## .
 
-  ## Make sure it is unique within the data file - if not then exit function and send warning
-  dupecheck <- which(duplicated(df.wq$UniqueID))
-  dupes <- df.wq$UniqueID[dupecheck] # These are the dupes
-
-  if (length(dupes) > 0) {
-    # Exit function and send a warning to userlength(dupes) # number of dupes
-    stop(paste(
-      "This data file contains", length(dupes),
-      "records that appear to be duplicates. Eliminate all duplicates before proceeding.",
-      "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")
-    ), call. = FALSE)
-  }
+  ## Duplicates are allowed for CVA results - numerous split samples
 
 
   ### Make sure records are not already in DB
 
-  Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
-  flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
+  Uniq <- dbGetQuery(pool, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+  flags <- dbGetQuery(pool, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
   dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID, ]
   dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
@@ -235,9 +220,12 @@ Eliminate all duplicates before proceeding.",
   }
   rm(Uniq)
 
+  # Remove the duplicates already in the database
+  df.wq <- anti_join(df.wq, dupes2, by = "UniqueID")
+
   ### DataSource
   df.wq <- df.wq %>%
-    mutate(DataSource = paste0("MWRA_", file))
+    mutate(DataSource = paste0(file))
 
   ### DataSourceID
   # Do some sorting first:
@@ -276,19 +264,24 @@ Eliminate all duplicates before proceeding.",
   # Set the vector for mapply to operate on
   x <- df.wq$ResultReported
 
-  # Function to determine FinalResult
-  FR <- function(x) {
-    if (str_detect(x, "<")) { # BDL
-      as.numeric(gsub("<", "", x), digits = 4) # THEN strip "<" from reported result, make numeric
-    } else if (str_detect(x, ">")) {
-      as.numeric(gsub(">", "", x)) # THEN strip ">" form reported result, make numeric.
-    } else {
-      as.numeric(x)
-    } # ELSE THEN just use Result Reported for Result and make numeric
-  }
+  #### !##### Temporary workaround for FinalResult Issue
+  df.wq$FinalResult <- df.wq$ResultReported
+  df.wq <- df.wq %>% mutate(FinalResult = as.numeric(gsub("<", "", FinalResult)))
+  df.wq$FinalResult <- round(df.wq$FinalResult, digits = 4)
 
-  df.wq$FinalResult <- mapply(FR, x) %>%
-    round(digits = 4)
+  # Function to determine FinalResult
+  # FR <- function(x) {
+  #  if(str_detect(x, "<")){# BDL
+  #     as.numeric(gsub("<","", x), digits =4)  # THEN strip "<" from reported result, make numeric
+  #  } else if (str_detect(x, ">")){
+  #    as.numeric(gsub(">","", x)) # THEN strip ">" form reported result, make numeric.
+  #  } else {
+  #    as.numeric(x)
+  #  }# ELSE THEN just use Result Reported for Result and make numeric
+  # }
+
+  # df.wq$FinalResult <- mapply(FR,x) %>%
+  #  round(digits = 4)
 
   ### Flag (numeric) ####
   # Use similar function as to assign flags
@@ -314,34 +307,32 @@ Eliminate all duplicates before proceeding.",
   # REMOVE ANY PRELIMINARY DATA     ###
   ######################################
 
-  # # Calculate the date range of import
-  # datemin <- min(df.wq$DateTimeET)
-  # datemax <- max(df.wq$DateTimeET)
-  #
-  # ### BELOW NOT NEEDED - NO PRELIMINARY DATA
-  #
-  # # IDs to look for - all records in time period in question
-  # qry <- glue("SELECT (ID) FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
-  # query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
-  #
-  # if (nrow(query.prelim) > 0) { # If true there is at least one record in the time range of the data
-  #   # SQL query that finds matching sample ID from tblSampleFlagIndex Flagged 102 within date range in question
-  #   qryS <- glue("SELECT [SampleID] FROM [{schema}].[{ImportFlagTable}] WHERE [FlagCode] = 102 AND [SampleID] IN ({paste0(query.prelim$ID, collapse = ", ")})")
-  #   qryDelete <- dbGetQuery(con, qryS) # Check the query to see if it returns any matches
-  #   # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
-  #   if (nrow(qryDelete) > 0) {
-  #     qryDeletePrelimData <- glue("DELETE FROM [{schema}].[{ImportTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [ID] IN ({paste0(qryDelete$SampleID, collapse = ", ")})")
-  #     rs <- dbSendStatement(con, qryDeletePrelimData)
-  #     print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
-  #     dbClearResult(rs)
-  #
-  #     # Next delete all flags associated with preliminary data - Will also delete any other flag associated with record number
-  #     qryDeletePrelimFlags <- glue("DELETE FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN ({paste0(qryDelete$SampleID, collapse = ", ")})")
-  #     rs <- dbSendStatement(con, qryDeletePrelimFlags)
-  #     print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
-  #     dbClearResult(rs)
-  #   }
-  # }
+  # Calculate the date range of import
+  #  datemin <- min(df.wq$DateTimeET)
+  #  datemax <- max(df.wq$DateTimeET)
+
+  #  # IDs to look for - all records in time period in question
+  #  qry <- glue("SELECT (ID) FROM [{schema}].[{ImportTable}] WHERE [DateTimeET] >= '{datemin}' AND [DateTimeET] <= '{datemax}'")
+  #  query.prelim <- dbGetQuery(con, qry) # This generates a list of possible IDs
+
+  #  if (nrow(query.prelim) > 0) {# If true there is at least one record in the time range of the data
+  #    # SQL query that finds matching sample ID from tblSampleFlagIndex Flagged 102 within date range in question
+  #    qryS <- glue("SELECT [SampleID] FROM [{schema}].[{ImportFlagTable}] WHERE [FlagCode] = 102 AND [SampleID] IN ({paste0(query.prelim$ID, collapse = ",")})")
+  #    qryDelete <- dbGetQuery(con,qryS) # Check the query to see if it returns any matches
+  #    # If there are matching records then delete preliminary data (IDs flagged 102 in period of question)
+  #    if(nrow(qryDelete) > 0) {
+  #      qryDeletePrelimData <- glue("DELETE FROM [{schema}].[{ImportTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [ID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
+  #      rs <- dbSendStatement(con,qryDeletePrelimData)
+  #      print(paste(dbGetRowsAffected(rs), "preliminary records were deleted during this import", sep = " ")) # Need to display this message to the Shiny UI
+  #      dbClearResult(rs)
+
+  # Next delete all flags associated with preliminary data - Will also delete any other flag associated with record number
+  #      qryDeletePrelimFlags <- glue("DELETE FROM [{schema}].[{ImportFlagTable}] WHERE [DataTableName] = 'tblMWRAResults' AND [SampleID] IN ({paste0(qryDelete$SampleID, collapse = ",")})")
+  #      rs <- dbSendStatement(con, qryDeletePrelimFlags)
+  #      print(paste(dbGetRowsAffected(rs), "preliminary record data flags were deleted during this import", sep = " "))
+  #      dbClearResult(rs)
+  #    }
+  #  }
 
 
   ######################################################################## .
@@ -351,7 +342,7 @@ Eliminate all duplicates before proceeding.",
   # Read Tables
   # WQ ##
   setIDs <- function() {
-    query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
+    query.wq <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
     # Get current max ID
     if (is.na(query.wq)) {
       query.wq <- 0
@@ -372,7 +363,7 @@ Eliminate all duplicates before proceeding.",
   setFlagIDs <- function() {
     if (all(is.na(df.wq$FlagCode)) == FALSE) { # Condition returns FALSE if there is at least 1 non-NA value, if so proceed
       # Split the flags into a separate df and assign new ID
-      df.flags <- as.data.frame(dplyr::select(df.wq, c("ID", "FlagCode"))) %>%
+      df.flags <- as.data.frame(select(df.wq, c("ID", "FlagCode"))) %>%
         rename("SampleID" = ID) %>%
         drop_na()
     } else {
@@ -380,7 +371,7 @@ Eliminate all duplicates before proceeding.",
     }
 
     if (class(df.flags) == "data.frame") {
-      query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
+      query.flags <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
       if (is.na(query.flags)) {
         query.flags <- 0
@@ -412,7 +403,7 @@ Eliminate all duplicates before proceeding.",
   ##############################################################################################################################
 
   ### Deselect Columns that do not need to be in Database
-  df.wq <- df.wq %>% dplyr::select(-c(
+  df.wq <- df.wq %>% select(-c(
     Description,
     SampleDate,
     FlagCode,
@@ -421,16 +412,8 @@ Eliminate all duplicates before proceeding.",
   ))
 
   # Reorder remaining 30 columns to match the database table exactly ####
-  col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
+  col.order.wq <- dbListFields(pool, schema_name = schema, name = ImportTable)
   df.wq <- df.wq[, col.order.wq]
-
-  ### QC Test ####
-  source("src/Functions/WITQCTEST.R", local = T)
-  
-  qc_message <- QCCHECK( df.qccheck = df.wq, 
-                         file = file, 
-                         ImportTable = ImportTable)
-  print(qc_message)
 
   # Create a list of the processed datasets
   dfs <- list()
@@ -439,8 +422,8 @@ Eliminate all duplicates before proceeding.",
   dfs[[3]] <- df.flags # Removed condition to test for flags and put it in the setFlagIDS() function
 
   # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  dbDisconnect(pool)
+  rm(pool)
   return(dfs)
 } # END FUNCTION ####
 
@@ -462,6 +445,15 @@ Eliminate all duplicates before proceeding.",
 # if(!file.exists(processed_dir)) {
 #   dir.create(processed_dir)
 # }
+
+# This should be one-time code used for importing historical data - delete if not needed for incoming data
+# str(df.wq)
+# df.wq <- as.data.frame(df.wq)
+# df.wq$ID <- as.integer(df.wq$ID)
+# df.wq$DetectionLimit <- as.numeric(df.wq$DetectionLimit)
+# df.wq$DataSourceID <- as.integer(df.wq$DataSourceID)
+# df.wq$ImportDate <- as.Date(df.wq$ImportDate)
+# df.wq <- filter(df.wq, df.wq$FinalResult!= "NA")
 
 
 IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, processedfolder, ImportTable, ImportFlagTable = NULL) {
@@ -503,5 +495,12 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db, process
 
   return("Import Successful")
 }
+
+
+# IMPORT_DATA(df.wq,
+#   df.flags = NULL, path, file, filename.db, processedfolder = NULL,
+#   ImportTable = ImportTable, ImportFlagTable = NULL
+# )
+
 
 ### END
