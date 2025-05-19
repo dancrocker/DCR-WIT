@@ -112,6 +112,12 @@ names(df.wq) <-  c("SampleGroup",
                  "DetectionLimit")
 
 
+ltf_locs <- c("FHLN", "FPRN", "HLNW", "PRNW")
+
+if(any(ltf_locs %in% df.wq$Location)) {
+  stop(print("This file contains Long-term forestry data. Split out the Long-term Forestry data from this file (if necessary) and use the WATBMP import script to process and import"))
+}
+
 ### Date and Time ####
 
 # Split the Sample time into date and time
@@ -229,8 +235,10 @@ flags <- tbl(pool, DBI::Id(schema = schema, table = ImportFlagTable)) |>
   filter(FlagCode == 102) |> 
   collect()
 
-dupes2 <- Uniq[!Uniq$ID %in% flags$SampleID,]
-
+# Filter out preliminary records and ltf data - these now get imported separately
+dupes2 <- Uniq |> 
+  filter(!ID %in% flags$SampleID,
+         !Location %in% ltf_locs)
 # take out any preliminary samples (they should get overwritten during import)
 if (nrow(dupes2) > 0) {
   # Exit function and send a warning to user
