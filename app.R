@@ -471,7 +471,10 @@ server <- function(input, output, session) {
   
   ### Import Email Message ####
   qcpath <- reactive({
-    paste0("file:///", str_replace_all(config[["QC_Logfiles"]],"/","\\\\"), "\\\\", ImportTable(),"_", gsub(" ","%20",input$file),"_",format(Sys.Date(),"%Y-%m-%d"),".txt")
+    gsub(" ","%20", paste0(config[["wach_sp_root"]],config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
+  })
+  qcpath_quab <- reactive({
+    gsub(" ","%20", paste0(config[["quab_sp_root"]],config[["QC_Logfiles_Q"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))
   })
   reactive_emailmsg <- reactiveVal(
     ""
@@ -480,17 +483,27 @@ server <- function(input, output, session) {
     ""
   )  
   observeEvent(input$import, {
-    if(file.exists(paste0(config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+    if(file.exists(paste0(wach_team_root,config[["QC_Logfiles"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
       reactive_emailmsg(
         paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file, 
-               " for data between the dates of ", min_dt_data()," and ", min_dt_data(),"</p>
+               " for data between the dates of ", min_dt_data()," and ", max_dt_data(),"</p>
                <p>Warning: Quality control outliers found in imported data. See QC Log <a href=", qcpath(),">", 
                ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
         )
       reactive_emailsubject(
         paste0("New Data has been Imported to a ", userlocation," Database with QC Warning")
       )
-    } else {
+    } else if (file.exists(paste0(quab_team_root,config[["QC_Logfiles_Q"]],"/",ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt"))){
+        reactive_emailmsg(
+          paste0("<body><p>",username," has imported ", nrow(df.wq()), " new record(s) for the dataset: ",input$datatype[[1]], ": Filename = ", input$file, 
+                 " for data between the dates of ", min_dt_data()," and ", max_dt_data(),"</p>
+               <p>Warning: Quality control outliers found in imported data. See QC Log <a href=", qcpath_quab(),">", 
+                 ImportTable(),"_",input$file,"_",format(Sys.Date(),"%Y-%m-%d"),".txt</a> for details.</p></body>")
+        )
+        reactive_emailsubject(
+          paste0("New Data has been Imported to a ", userlocation," Database with QC Warning")
+        )
+      } else {
       ### Need to develop options for the different date/time possiblities for the different data sets
       reactive_emailmsg(
           paste0("<body><p>",username," has imported ", nrow(df.wq()), 
@@ -501,6 +514,7 @@ server <- function(input, output, session) {
       reactive_emailsubject(
         paste0("New Data has been Imported to a ", userlocation," Database")
       )
+      
     }
   }, ignoreInit = TRUE)
     
