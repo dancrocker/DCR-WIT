@@ -133,7 +133,10 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   ### QC Test ####
   source("src/Functions/WITQCTEST.R", local = T)
   
-  qc_message <- QCCHECK( df.qccheck = df.wq, 
+  # QCCHECK needs the sampling location column to be called "Location" and not "Site"
+  df.wq.loc <- df.wq %>% mutate(Location = Site)
+  
+  qc_message <- QCCHECK( df.qccheck = df.wq.loc, 
                          file = file, 
                          ImportTable = ImportTable)
   print(qc_message)
