@@ -18,35 +18,34 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   path <- paste0(rawdatafolder,"/", file)
   
   # Read in the raw data - defaults to the last sheet added
-  YSI.df <- read.csv(path, header=TRUE)
-  #YSI.df  <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
+  df.wq <- read.csv(path, header=TRUE)
+  #df.wq  <- read_excel(path, sheet= 1, col_names = T, trim_ws = T, na = "nil") %>%
   #  as.data.frame() 
   
   # Data class/formats
-  YSI.df$Timestamp <- as.POSIXct(paste(mdy(YSI.df$Date), YSI.df$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
-  #YSI.df$Timestamp <- as.POSIXct(paste(mdy(YSI.df$ï..Date), YSI.df$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
+  df.wq$DateTimeET <- as.POSIXct(paste(mdy(df.wq$Date), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
+  #df.wq$DateTimeET <- as.POSIXct(paste(mdy(df.wq$ï..Date), df.wq$Time, sep = " "), format = "%Y-%m-%d %H:%M:%S", tz = "America/New_York", usetz = T)
   
   # Drop unnecesary columns from DF - these columns are not needed for the database
-  #YSI.df <- YSI.df %>% select(-c(Date, Time, pH.mV, B.pH, B.pH.mV, Pressure.mmHg.))
-  YSI.df <- YSI.df %>% select(-c(Date, Time))
-  #YSI.df <- YSI.df %>% select(-c(ï..Date, Time))
+  #df.wq <- df.wq %>% select(-c(Date, Time, pH.mV, B.pH, B.pH.mV, Pressure.mmHg.))
+  df.wq <- df.wq %>% select(-c(Date, Time))
+  #df.wq <- df.wq %>% select(-c(ï..Date, Time))
   
   #Change our parameter names to match DB parameter abbreviations
-  YSI.df <-  plyr::rename(YSI.df,
+  df.wq <-  plyr::rename(df.wq,
                           c("Temp.C." = "TWA-C"))  
-  YSI.df <- rename(YSI.df, c("LDOs" = "DO..."))  
-  YSI.df <- rename(YSI.df, c("LDOd" = "DO.mg.L.")) 
-  YSI.df <- rename(YSI.df, c("SPCD" = "SPC.uS.cm."))
-  YSI.df <- rename(YSI.df, c("Station" = "Site"))
-  YSI.df <- rename(YSI.df, c("DataSource" = "DataID"))
-  YSI.df$Probe_Type <- "YSI PRO QUATRO"
+  df.wq <- rename(df.wq, c("LDOs" = "DO..."))  
+  df.wq <- rename(df.wq, c("LDOd" = "DO.mg.L.")) 
+  df.wq <- rename(df.wq, c("SPCD" = "SPC.uS.cm."))
+  df.wq <- rename(df.wq, c("DataSource" = "DataID"))
+  df.wq$Probe_Type <- "YSI PRO QUATRO"
   
   # reformat the Quabbin Trib field data to "Tidy" data format ("Long" instead of "Wide")
-  YSI.df <- gather(YSI.df, Parameter, FinalResult, c("SPCD","LDOd", "LDOs", "pH","TWA-C"))
-  YSI.df$FinalResult <- round(as.numeric(YSI.df$FinalResult), 2)
+  df.wq <- gather(df.wq, Parameter, FinalResult, c("SPCD","LDOd", "LDOs", "pH","TWA-C"))
+  df.wq$FinalResult <- round(as.numeric(df.wq$FinalResult), 2)
   
   #Create a UniqueID field that gathers data from different fields together to be unique for each record
-  YSI.df$UniqueID <- paste(YSI.df$Station, YSI.df$Timestamp, YSI.df$Parameter,  sep = "_")
+  df.wq$UniqueID <- paste(df.wq$Site, df.wq$DateTimeET, df.wq$Parameter,  sep = "_")
   
   # Connect to db for queries below
   ### Connect to Database   
@@ -54,17 +53,18 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   database <- "DCR_DWSP"
   schema <- "Quabbin"
   tz <- 'America/New_York'
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
   
-  df_param <- dbReadTable(con,  Id(schema = "Wachusett", table = "tblParameters"))
-  YSI.df$Parameter <- df_param$ParameterName[match(YSI.df$Parameter, df_param$ParameterAbbreviation)]
+  
+  df_param <- dbReadTable(pool,  Id(schema = "Wachusett", table = "tblParameters"))
+  df.wq$Parameter <- df_param$ParameterName[match(df.wq$Parameter, df_param$ParameterAbbreviation)]
   # Now we use the match function to create the field "Units", populating this field with the units corresponding to the
   # record's parameter name
-  YSI.df$Units <- df_param$ParameterUnits[match(YSI.df$Parameter, df_param$ParameterName)]
+  df.wq$Units <- df_param$ParameterUnits[match(df.wq$Parameter, df_param$ParameterName)]
   
   ## Make sure it is unique within the data file - if not then exit function and send warning
-  dupecheck <- which(duplicated(YSI.df$UniqueID))
-  dupes <- YSI.df$UniqueID[dupecheck] # These are the dupes
+  dupecheck <- which(duplicated(df.wq$UniqueID))
+  dupes <- df.wq$UniqueID[dupecheck] # These are the dupes
   
   if (length(dupes) > 0){
     # Exit function and send a warning to userlength(dupes) # number of dupes
@@ -73,8 +73,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
                "The duplicate records include:", paste(head(dupes, 15), collapse = ", ")), call. = FALSE)
   }
   
-  Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
-  dupes2 <- Uniq[Uniq$UniqueID %in% YSI.df$UniqueID,]
+  Uniq <- dbGetQuery(pool, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+  dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID,]
   
   if (nrow(dupes2) > 0){
     # Exit function and send a warning to user
@@ -85,28 +85,47 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   }
   rm(Uniq)
   
+  ########################################################################.
+  ###                          Check for locations not in database    ####
+  ########################################################################.
+  
+  # Bring in locations table
+  db_locations <- na.omit(dbGetQuery(pool, glue("SELECT [LocationMWRA] FROM [{schema}].[tblLocations]")))
+  new_locs <- setdiff(
+    df.wq %>%
+      filter(!Site %in% c("FIELD_QC_DUP", "MISC")) %>% .$Site,
+    db_locations$LocationMWRA
+  )
+  if (length(new_locs) > 0) {
+    stop(paste0(
+      "The following locations are in the data but not in tblLocations: ",
+      paste0(new_locs, collapse = ", "),
+      ". Fix data site names or update tblLocations before importing."
+    ))
+  }
+  
   ###############################################################################################
   
   ###############################################################################################
   
   ### DataSource
-  YSI.df <- YSI.df %>% mutate(DataSource = file)
+  df.wq <- df.wq %>% mutate(DataSource = file)
   
   ### DataSourceID
   # Do some sorting first:
-  YSI.df <- YSI.df[with(YSI.df, order(Timestamp, Station)),]
+  df.wq <- df.wq[with(df.wq, order(DateTimeET, Site)),]
   
   # Assign the numbers
-  YSI.df$DataSourceID <- seq(1, nrow(YSI.df), 1)
+  df.wq$DataSourceID <- seq(1, nrow(df.wq), 1)
   
   ### Importdate (Date)
-  YSI.df$ImportDate <- today()
+  df.wq$ImportDate <- today()
   
   
   # Read Tables
   # WQ
   setIDs <- function(){
-    query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
+    query.wq <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
     # Get current max ID
     if(is.na(query.wq)) {
       query.wq <- 0
@@ -117,18 +136,14 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     rm(query.wq)
     
     ### ID wq
-    YSI.df$ID <- seq.int(nrow(YSI.df)) + ID.max.wq }
+    df.wq$ID <- seq.int(nrow(df.wq)) + ID.max.wq }
   
-  YSI.df$ID <- setIDs()
+  df.wq$ID <- setIDs()
   
   
-  # Reorder remaining columns to match the database table exactly
-  YSI.df <- YSI.df[, c("ID","Station","Timestamp","Parameter","FinalResult","Units","Probe_Type", "UniqueID","DataSource","DataSourceID","ImportDate")]
-  
-  df.wq <-  YSI.df %>%
-    rename(
-      Site = Station,
-      DateTimeET = Timestamp)
+  # Reorder remaining columns to match the database table exactly ####
+  col.order.wq <- dbListFields(pool, schema_name = schema, name = ImportTable)
+  df.wq <- df.wq[, col.order.wq]
   
   ### QC Test ####
   source("src/Functions/WITQCTEST.R", local = T)
@@ -148,8 +163,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   dfs[[3]] <- NULL # Removed condition to test for flags and put it in the setFlagIDS() function
   
   # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  poolClose(pool)
+  rm(pool)
   return(dfs) 
     
 }

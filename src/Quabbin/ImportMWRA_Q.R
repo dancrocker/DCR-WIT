@@ -59,8 +59,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   database <- "DCR_DWSP"
   schema <- "Quabbin"
   tz <- "America/New_York"
-  con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
-
+  pool <- dbPool(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
+  
 
   #################################
   #  START REFORMATTING THE DATA  #
@@ -170,7 +170,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   }
 
   ### Fix the Parameter names ####  - change from MWRA name to ParameterName
-  params <- dbReadTable(con, Id(schema = "Wachusett", table = "tblParameters"))
+  params <- dbReadTable(pool, Id(schema = "Wachusett", table = "tblParameters"))
   df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
 
@@ -189,7 +189,36 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   # Fix the Location names
   df.wq$Location %<>%
     gsub("QUABBINT-", "", .) %>%
-    gsub("QUABBIN-", "", .)
+    gsub("QUABBIN-", "", .) %>%
+    gsub("109X","109-X", .) %>%
+    gsub("21A1","211A-1", .) %>%
+    gsub("21Bx","211B-X", .) %>%
+    gsub("26E1","216E-1", .) %>%
+    gsub("26IX","216I-X", .) %>%
+    gsub("26N1","216N-1", .) %>%
+    gsub("217X","217-X", .) %>%
+    gsub("109X","109-X", .)
+    
+    
+  
+  ########################################################################.
+  ###                          Check for locations not in database    ####
+  ########################################################################.
+  
+  # Bring in locations table
+  db_locations <- na.omit(dbGetQuery(pool, glue("SELECT [LocationMWRA] FROM [{schema}].[tblLocations]")))
+  new_locs <- setdiff(
+    df.wq %>%
+      filter(!Location %in% c("FIELD_QC_DUP", "MISC")) %>% .$Location,
+    db_locations$LocationMWRA
+  )
+  if (length(new_locs) > 0) {
+    stop(paste0(
+      "The following locations are in the data but not in tblLocations: ",
+      paste0(new_locs, collapse = ", "),
+      ". Fix data site names or update tblLocations before importing."
+    ))
+  }
 
   ######################
   #   Add new Columns  #
@@ -219,8 +248,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
 
   ### Make sure records are not already in DB
 
-  Uniq <- dbGetQuery(con, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
-  flags <- dbGetQuery(con, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
+  Uniq <- dbGetQuery(pool, glue("SELECT [UniqueID], [ID] FROM [{schema}].[{ImportTable}]"))
+  flags <- dbGetQuery(pool, glue("SELECT [SampleID], [FlagCode] FROM [{schema}].[{ImportFlagTable}] WHERE FlagCode = 102"))
   dupes2 <- Uniq[Uniq$UniqueID %in% df.wq$UniqueID, ]
   dupes2 <- filter(dupes2, !ID %in% flags$SampleID) # take out any preliminary samples (they should get overwritten during import)
 
@@ -351,7 +380,7 @@ Eliminate all duplicates before proceeding.",
   # Read Tables
   # WQ ##
   setIDs <- function() {
-    query.wq <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
+    query.wq <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportTable}]"))
     # Get current max ID
     if (is.na(query.wq)) {
       query.wq <- 0
@@ -380,7 +409,7 @@ Eliminate all duplicates before proceeding.",
     }
 
     if (class(df.flags) == "data.frame") {
-      query.flags <- dbGetQuery(con, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
+      query.flags <- dbGetQuery(pool, glue("SELECT max(ID) FROM [{schema}].[{ImportFlagTable}]"))
       # Get current max ID
       if (is.na(query.flags)) {
         query.flags <- 0
@@ -421,7 +450,7 @@ Eliminate all duplicates before proceeding.",
   ))
 
   # Reorder remaining 30 columns to match the database table exactly ####
-  col.order.wq <- dbListFields(con, schema_name = schema, name = ImportTable)
+  col.order.wq <- dbListFields(pool, schema_name = schema, name = ImportTable)
   df.wq <- df.wq[, col.order.wq]
 
   ### QC Test ####
@@ -439,8 +468,8 @@ Eliminate all duplicates before proceeding.",
   dfs[[3]] <- df.flags # Removed condition to test for flags and put it in the setFlagIDS() function
 
   # Disconnect from db and remove connection obj
-  dbDisconnect(con)
-  rm(con)
+  poolClose(pool)
+  rm(pool)
   return(dfs)
 } # END FUNCTION ####
 
