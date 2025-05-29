@@ -192,7 +192,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     gsub("QUABBIN-", "", .) %>%
     gsub("109X","109-X", .) %>%
     gsub("21A1","211A-1", .) %>%
-    gsub("21Bx","211B-X", .) %>%
+    gsub("21BX","211B-X", .) %>%
     gsub("26E1","216E-1", .) %>%
     gsub("26IX","216I-X", .) %>%
     gsub("26N1","216N-1", .) %>%
