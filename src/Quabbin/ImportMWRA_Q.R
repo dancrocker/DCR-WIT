@@ -210,7 +210,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   new_locs <- setdiff(
     df.wq %>%
       filter(!Location %in% c("FIELD_QC_DUP", "FIELD_QC_FDUP","FIELD-QC-DUP","FIELD-QC-FDUP", "MISC")) %>% .$Location,
-    db_locations$LocationMWRA
+    db_locations$LocationMWRA 
   )
   if (length(new_locs) > 0) {
     stop(paste0(
