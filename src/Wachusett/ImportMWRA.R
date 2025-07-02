@@ -663,7 +663,8 @@ source("src/Functions/WITQCTEST.R", local = T)
 
 qc_message <- QCCHECK( df.qccheck = df.wq, 
                        file = file, 
-                       ImportTable = ImportTable)
+                       ImportTable = ImportTable,
+                       userlocation = userlocation)
 print(qc_message)
 
 ### Create a list of the processed datasets ####

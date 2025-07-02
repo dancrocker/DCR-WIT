@@ -360,7 +360,8 @@ if(identical(names(df), cols)) {
 source(paste0(getwd(),"/src/Functions/WITQCTEST.R"))
 qc_message <- QCCHECK(df.qccheck = df, 
                       file = file,
-                      ImportTable = ImportTable)
+                      ImportTable = ImportTable,
+                      userlocation = userlocation)
 print(qc_message)
 
 # Create a list of the processed datasets
@@ -419,8 +420,6 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db , proces
   poolClose(pool)
   rm(pool)
   
-  ### Move Field Parameter csv files to the processed data folder ####
-  print(glue("Moving staged field parameter csv file ({file}) to the imported folder..."))
   # Move the raw data file to the processed folder ####
   processed_subdir <- paste0("/", max(year(df.wq$DateTimeET))) # Raw data archived by year, subfolders = Year
   processed_dir <- paste0(processedfolder, processed_subdir)
@@ -430,7 +429,8 @@ IMPORT_DATA <- function(df.wq, df.flags = NULL, path, file, filename.db , proces
    }
   
   file.rename(path, paste0(processed_dir,"/", file))
-  
+  ### Move Field Parameter csv files to the processed data folder ####
+  print(glue("Moved staged field parameter csv file ({file}) to the imported folder..."))
   end <- now()
   return(print(glue("Import finished at {end}, \n elapsed time {round(end - start)} seconds")))  
  }

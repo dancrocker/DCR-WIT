@@ -24,7 +24,7 @@ BACT_DUP_TEST <- function(TribResult, DupResult, RPD) {
 }
 
 ### Function compares df.qccheck records (in the format at the end of WIT processing before importing) to historical min/max and percentiles
-QCCHECK <- function(df.qccheck, file, ImportTable) {
+QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
   ### FETCH CACHED DATA FROM WAVE RDS FILES ####
 
   files <- c("trib_quab_ware_summary.rds","trib_wach_summary.rds")
@@ -45,7 +45,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable) {
   ### Connect to Database ####
   dsn <- "DCR_DWSP_App_R"
   database <- "DCR_DWSP"
-  schema <- "Wachusett"
+  schema <- userlocation
   tz <- "UTC"
   con <- dbConnect(odbc::odbc(), dsn = dsn, uid = dsn, pwd = config[["DB Connection PW"]], timezone = tz)
 
@@ -382,4 +382,4 @@ QCCHECK <- function(df.qccheck, file, ImportTable) {
 
 ##########################################################################################
 
-# qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable)
+# qc_message <- QCCHECK(df.qccheck=df.wq,file=file,ImportTable=ImportTable, userlocation = userlocation)
