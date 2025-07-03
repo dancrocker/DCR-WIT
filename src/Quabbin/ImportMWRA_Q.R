@@ -173,6 +173,10 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   params <- dbReadTable(pool, Id(schema = "Wachusett", table = "tblParameters"))
   df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
+  # Fix dissolved silica
+  df.wq <- df.wq %>% mutate(Parameter = case_when(ReportedName == "Dissolved Metals ICP" & Parameter == "Total Silica" ~ "Dissolved Silica",
+                                                  TRUE ~ Parameter))
+  
 
   ### Remove records with missing elements/unneeded data ####
   # Delete possible Sample Address rows (Associated with MISC Sample Locations):
@@ -199,6 +203,12 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
     gsub("217X","217-X", .) %>%
     gsub("109X","109-X", .)
     
+    
+  # Fix units
+  df.wq$Units %<>%
+    gsub("CFU/100ML", "CFU/100 mL", .) %>%
+    gsub("CFU/100 ML", "CFU/100 mL", .) %>%
+    gsub("^f$", "ft", ., ignore.case = FALSE)
     
   
   ########################################################################.
@@ -458,7 +468,8 @@ Eliminate all duplicates before proceeding.",
   
   qc_message <- QCCHECK( df.qccheck = df.wq, 
                          file = file, 
-                         ImportTable = ImportTable)
+                         ImportTable = ImportTable,
+                         userlocation = userlocation)
   print(qc_message)
 
   # Create a list of the processed datasets
