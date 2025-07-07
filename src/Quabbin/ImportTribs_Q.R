@@ -153,7 +153,8 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   
   qc_message <- QCCHECK( df.qccheck = df.wq.loc, 
                          file = file, 
-                         ImportTable = ImportTable)
+                         ImportTable = ImportTable,
+                         userlocation = userlocation)
   print(qc_message)
 
   # Create a list of the processed datasets
