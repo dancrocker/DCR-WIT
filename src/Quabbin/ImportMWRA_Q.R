@@ -174,7 +174,7 @@ PROCESS_DATA <- function(file, rawdatafolder, filename.db, probe = NULL, ImportT
   df.wq$Parameter <- params$ParameterName[match(df.wq$Parameter, params$ParameterMWRAName)]
 
   # Fix dissolved silica
-  df.wq <- df.wq %>% mutate(Parameter = case_when(ReportedName == "Dissolved Metals ICP" & Parameter == "Total Silica" ~ "Dissolved Silica",
+  df.wq <- df.wq %>% mutate(Parameter = case_when(grepl("Dissolved",ReportedName) & Parameter == "Total Silica" ~ "Dissolved Silica",
                                                   TRUE ~ Parameter))
   
 
