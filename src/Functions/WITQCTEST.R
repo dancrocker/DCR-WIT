@@ -76,12 +76,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
   rangeoutliers <- dplyr::mutate(rangeoutliers, HistoricalMin = NA, HistoricalMean = NA, HistoricalMax = NA)
 
   ### Creates input dataframe without Staff Gauge Height for QC check against trib_summary
-  df.qccheckNOgauge <- dplyr::filter(df.qccheck, Parameter != "Staff Gauge Height") %>%
-    mutate(Season = case_when(month(DateTimeET) %in% c(3,4,5) ~ "Spring",
-                              month(DateTimeET) %in% c(6,7,8) ~ "Summer",
-                              month(DateTimeET) %in% c(9,10,11) ~ "Fall",
-                              month(DateTimeET) %in% c(12,1,2) ~ "Winter"    
-    ))
+  df.qccheckNOgauge <- dplyr::filter(df.qccheck, Parameter != "Staff Gauge Height")
 
   ### Loop to look for correct parameter/units, compare results with possible min/max, and then QC check against trib_summary
   if (userlocation == "Wachusett") {
@@ -362,84 +357,64 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
           } else {
             ### QC check against trib_summary
             
-            # Only runs QC check on each result if the location/parameter/unit/season combination in the imported data is present in the summary RDS file, else will skip that record and proceed to next record
-            if (df.qccheckNOgauge$Location[i] %in% dplyr::filter(trib_summary, 
-                                                                 Site == df.qccheckNOgauge$Location[i], 
-                                                                 Parameter == df.qccheckNOgauge$Parameter[i], 
-                                                                 Units == df.qccheckNOgauge$Units[i],
-                                                                 Season == df.qccheckNOgauge$Season[i])$Site &
-                df.qccheckNOgauge$Parameter[i] %in% dplyr::filter(trib_summary, 
-                                                                  Site == df.qccheckNOgauge$Location[i], 
-                                                                  Parameter == df.qccheckNOgauge$Parameter[i], 
-                                                                  Units == df.qccheckNOgauge$Units[i],
-                                                                  Season == df.qccheckNOgauge$Season[i])$Parameter &
-                df.qccheckNOgauge$Units[i] %in% dplyr::filter(trib_summary, 
-                                                              Site == df.qccheckNOgauge$Location[i], 
-                                                              Parameter == df.qccheckNOgauge$Parameter[i], 
-                                                              Units == df.qccheckNOgauge$Units[i],
-                                                              Season == df.qccheckNOgauge$Season[i])$Units &
-                 df.qccheckNOgauge$Season[i] %in% dplyr::filter(trib_summary, 
-                                                            Site == df.qccheckNOgauge$Location[i], 
-                                                            Parameter == df.qccheckNOgauge$Parameter[i], 
-                                                            Units == df.qccheckNOgauge$Units[i],
-                                                            Season == df.qccheckNOgauge$Season[i])$Season) 
-              
-              
-              {
+            # Only runs QC check on each result if the location/parameter/unit combination in the imported data is present in the summary RDS file, else will skip that record and proceed to next record
+            if (df.qccheckNOgauge$Location[i] %in% dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$Site &
+                df.qccheckNOgauge$Parameter[i] %in% dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$Parameter &
+                df.qccheckNOgauge$Units[i] %in% dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$Units) {
               # Add to rangeoutliers if less than historical minimum for that site/parameter
-              if (df.qccheckNOgauge$FinalResult[i] < dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$Min) {
+              if (df.qccheckNOgauge$FinalResult[i] < dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$Min) {
                 rangeoutliers <- df.qccheckNOgauge[i, ] %>%
                   cbind(trib_summary %>%
-                          filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i]) %>%
+                          filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                           select(one_of(c("Min", "Mean", "Max"))) %>%
                           rename(
-                            HistoricalMin = Min,
-                            HistoricalMean = Mean,
-                            HistoricalMax = Max
+                            `Historical Min` = Min,
+                            `Historical Mean` = Mean,
+                            `Historical Max`= Max
                           )) %>%
                   bind_rows(rangeoutliers)
               } else {
                 # Add to rangeoutliers if greater than historical maximum for that site/parameter
-                if (df.qccheckNOgauge$FinalResult[i] > dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$Max) {
+                if (df.qccheckNOgauge$FinalResult[i] > dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$Max) {
                   rangeoutliers <- df.qccheckNOgauge[i, ] %>%
                     cbind(trib_summary %>%
-                            filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i]) %>%
+                            filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                             select(one_of(c("Min", "Mean", "Max"))) %>%
                             rename(
-                              HistoricalMin = Min,
-                              HistoricalMean = Mean,
-                              HistoricalMax = Max
+                              `HistoricalMin` = Min,
+                              `HistoricalMean` = Mean,
+                              `HistoricalMax` = Max
                             )) %>%
                     bind_rows(rangeoutliers)
                 } else {
                   # Add to statoutliers if FinalValue is less than (25th percentile - 1.5 times the interquartile range) that site/parameter
-                  if (df.qccheckNOgauge$FinalResult[i] < ((dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$percentile25) - (1.5 * (dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$IQR)))) {
+                  if (df.qccheckNOgauge$FinalResult[i] < ((dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$percentile25) - (1.5 * (dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$IQR)))) {
                     statoutliers <- df.qccheckNOgauge[i, ] %>%
                       cbind(trib_summary %>%
                               filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                               select(one_of(c("Min", "percentile25", "Median", "percentile75", "Max", "IQR"))) %>%
                               rename(
-                                HistoricalMin = Min,
-                                Percentile25 = percentile25,
-                                HistoricalMedian = Median,
-                                Percentile75 = percentile75,
-                                HistoricalMax = Max,
+                                `Historical Min` = Min,
+                                `25th Percentile` = percentile25,
+                                `Historical Median` = Median,
+                                `75th Percentile` = percentile75,
+                                `Historical Max` = Max,
                                 IQR = IQR
                               )) %>%
                       bind_rows(statoutliers)
                   } else {
                     # Add to statoutliers if FinalValue is greater than (75th percentile + 1.5 times the interquartile range) that site/parameter
-                    if (df.qccheckNOgauge$FinalResult[i] > ((dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$percentile75) + (1.5 * (dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i])$IQR)))) {
+                    if (df.qccheckNOgauge$FinalResult[i] > ((dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$percentile75) + (1.5 * (dplyr::filter(trib_summary, Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i])$IQR)))) {
                       statoutliers <- df.qccheckNOgauge[i, ] %>%
                         cbind(trib_summary %>%
-                                filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i], Season == df.qccheckNOgauge$Season[i]) %>%
+                                filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                                 select(one_of(c("Min", "percentile25", "Median", "percentile75", "Max", "IQR"))) %>%
                                 rename(
-                                  HistoricalMin = Min,
-                                  Percentile25 = percentile25,
-                                  HistoricalMedian = Median,
-                                  Percentile75 = percentile75,
-                                  HistoricalMax = Max,
+                                  `Historical Min` = Min,
+                                  `25th Percentile` = percentile25,
+                                  `Historical Median` = Median,
+                                  `75th Percentile` = percentile75,
+                                  `Historical Max` = Max,
                                   IQR = IQR
                                 )) %>%
                         bind_rows(statoutliers)
@@ -452,6 +427,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         }
       }
     }
+    
     
     ### Print results of outlier check to unique WIT log
     QC_log_dir <- paste0(quab_team_root, config[["QC_Logfiles_Q"]])
@@ -474,15 +450,16 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         rangeoutliers <- rangeoutliers %>% arrange(ID)
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat(paste0(nrow(rangeoutliers), " record(s) outside historical range.\n\n"), append = T)
-        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Season", "Parameter", "Units","FinalResult", "HistoricalMin", "HistoricalMean", "HistoricalMax")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", `Historical Min`, `Historical Mean`, `Historical Max`)], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
       if (nrow(statoutliers) > 0) {
         statoutliers <- statoutliers %>% arrange(ID)
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
-        cat(paste0(nrow(statoutliers), " potential statistical outlier(s) in imported data.\n\n"), append = T)
-        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Season", "Parameter", "Units","FinalResult", "HistoricalMin", "Percentile25", "HistoricalMedian", "Percentile75", "HistoricalMax")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        cat(paste0(nrow(statoutliers), " potential statistical outlier(s) in imported data.\n"), append = T)
+        cat(paste0("Values are within historical range, but < (25th percentile - 1.5*Interquartile range) or > (75th percentile + 1.5*IQR).\n\n"), append = T)
+        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", `Historical Min`, `25th Percentile`, `Historical Median`, `75th Percentile`, `Historical Max`)], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
