@@ -70,10 +70,10 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
 
   ### Create empty dataframes for QC results with output column names
   statoutliers <- df.qccheck[NULL, names(df.qccheck)]
-  statoutliers <- dplyr::mutate(statoutliers, HistoricalMin = NA, Percentile25 = NA, HistoricalMedian = NA, Percentile75 = NA, HistoricalMax = NA, IQR = NA)
+  statoutliers <- dplyr::mutate(statoutliers, `Historical Min` = NA, `25th Percentile` = NA, `Historical Median` = NA, `75th Percentile` = NA, `Historical Max` = NA, IQR = NA)
 
   rangeoutliers <- df.qccheck[NULL, names(df.qccheck)]
-  rangeoutliers <- dplyr::mutate(rangeoutliers, HistoricalMin = NA, HistoricalMean = NA, HistoricalMax = NA)
+  rangeoutliers <- dplyr::mutate(rangeoutliers, `Historical Min` = NA, `Historical Mean` = NA, `Historical Max` = NA)
 
   ### Creates input dataframe without Staff Gauge Height for QC check against trib_summary
   df.qccheckNOgauge <- dplyr::filter(df.qccheck, Parameter != "Staff Gauge Height")
@@ -111,9 +111,9 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
                   filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                   select(one_of(c("Min", "Mean", "Max"))) %>%
                   rename(
-                    HistoricalMin = Min,
-                    HistoricalMean = Mean,
-                    HistoricalMax = Max
+                    `Historical Min` = Min,
+                    `Historical Mean` = Mean,
+                    `Historical Max` = Max
                   )) %>%
                 bind_rows(rangeoutliers)
             } else {
@@ -124,9 +124,9 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
                     filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                     select(one_of(c("Min", "Mean", "Max"))) %>%
                     rename(
-                      HistoricalMin = Min,
-                      HistoricalMean = Mean,
-                      HistoricalMax = Max
+                      `Historical Min` = Min,
+                      `Historical Mean` = Mean,
+                      `Historical Max` = Max
                     )) %>%
                   bind_rows(rangeoutliers)
               } else {
@@ -137,11 +137,11 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
                       filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                       select(one_of(c("Min", "percentile25", "Median", "percentile75", "Max", "IQR"))) %>%
                       rename(
-                        HistoricalMin = Min,
-                        Percentile25 = percentile25,
-                        HistoricalMedian = Median,
-                        Percentile75 = percentile75,
-                        HistoricalMax = Max,
+                        `Historical Min` = Min,
+                        `25th Percentile` = percentile25,
+                        `Historical Median` = Median,
+                        `75th Percentile` = percentile75,
+                        `Historical Max` = Max,
                         IQR = IQR
                       )) %>%
                     bind_rows(statoutliers)
@@ -153,11 +153,11 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
                         filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                         select(one_of(c("Min", "percentile25", "Median", "percentile75", "Max", "IQR"))) %>%
                         rename(
-                          HistoricalMin = Min,
-                          Percentile25 = percentile25,
-                          HistoricalMedian = Median,
-                          Percentile75 = percentile75,
-                          HistoricalMax = Max,
+                          `Historical Min` = Min,
+                          `25th Percentile` = percentile25,
+                          `Historical Median` = Median,
+                          `75th Percentile` = percentile75,
+                          `Historical Max` = Max,
                           IQR = IQR
                         )) %>%
                       bind_rows(statoutliers)
@@ -316,7 +316,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         rangeoutliers <- rangeoutliers %>% arrange(ID)
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat(paste0(nrow(rangeoutliers), " record(s) outside historical range.\n\n"), append = T)
-        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units", "FinalResult", "HistoricalMin", "HistoricalMean", "HistoricalMax")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units", "FinalResult", "Historical Min", "Historical Mean", "Historical Max")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
@@ -324,7 +324,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         statoutliers <- statoutliers %>% arrange(ID)
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat(paste0(nrow(statoutliers), " potential statistical outlier(s) in imported data.\n\n"), append = T)
-        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units", "FinalResult", "HistoricalMin", "Percentile25", "HistoricalMedian", "Percentile75", "HistoricalMax")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units", "FinalResult", "Historical Min", "25th Percentile", "Historical Median", "75th Percentile", "Historical Max")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
@@ -381,9 +381,9 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
                             filter(Site == df.qccheckNOgauge$Location[i], Parameter == df.qccheckNOgauge$Parameter[i], Units == df.qccheckNOgauge$Units[i]) %>%
                             select(one_of(c("Min", "Mean", "Max"))) %>%
                             rename(
-                              `HistoricalMin` = Min,
-                              `HistoricalMean` = Mean,
-                              `HistoricalMax` = Max
+                              `Historical Min` = Min,
+                              `Historical Mean` = Mean,
+                              `Historical Max` = Max
                             )) %>%
                     bind_rows(rangeoutliers)
                 } else {
@@ -450,7 +450,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         rangeoutliers <- rangeoutliers %>% arrange(ID)
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat(paste0(nrow(rangeoutliers), " record(s) outside historical range.\n\n"), append = T)
-        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", `Historical Min`, `Historical Mean`, `Historical Max`)], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        capture.output(print(rangeoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", "Historical Min", "Historical Mean", "Historical Max")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
@@ -459,7 +459,7 @@ QCCHECK <- function(df.qccheck, file, ImportTable, userlocation) {
         sink(file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat(paste0(nrow(statoutliers), " potential statistical outlier(s) in imported data.\n"), append = T)
         cat(paste0("Values are within historical range, but < (25th percentile - 1.5*Interquartile range) or > (75th percentile + 1.5*IQR).\n\n"), append = T)
-        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", `Historical Min`, `25th Percentile`, `Historical Median`, `75th Percentile`, `Historical Max`)], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
+        capture.output(print(statoutliers[c("ID", "Location", "DateTimeET", "Parameter", "Units","FinalResult", "Historical Min", "25th Percentile", "Historical Median", "75th Percentile", "Historical Max")], print.gap = 3, right = F, row.names = F), file = paste0(QC_log_dir, "/", ImportTable, "_", file, "_", format(Sys.Date(), "%Y-%m-%d"), ".txt"), append = T)
         cat("\n\n")
         sink()
       }
